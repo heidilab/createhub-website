@@ -133,7 +133,7 @@ export default async function HomePage() {
             {/* RIGHT — Floating elements */}
             <div className="lg:col-span-5 relative h-[500px] lg:h-[600px]">
               {/* Logo icon — center floating */}
-              <div className="absolute top-[8%] right-[5%] w-[180px] sm:w-[220px] lg:w-[260px] float-soft">
+              <div className="absolute top-[18%] lg:top-[8%] left-1/2 -translate-x-1/2 lg:left-auto lg:translate-x-0 lg:right-[5%] w-[180px] sm:w-[220px] lg:w-[260px] float-soft">
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-br from-brand-accent/30 to-brand-light/40 rounded-full blur-3xl" />
                   <Image
@@ -149,11 +149,10 @@ export default async function HomePage() {
 
               {/* Profile card — top right (rotating through founders) */}
               {team.length > 0 && (
-                <div
-                  className="absolute -top-2 right-[40%] z-30 float-soft-delayed"
-                  style={{ transform: "rotate(-3deg)" }}
-                >
-                  <RotatingFounderCard founders={team} intervalMs={4000} />
+                <div className="absolute -top-2 left-1/2 -translate-x-1/2 lg:left-auto lg:translate-x-0 lg:right-[40%] z-30 float-soft-delayed max-w-[92vw] lg:max-w-none">
+                  <div style={{ transform: "rotate(-3deg)" }}>
+                    <RotatingFounderCard founders={team} intervalMs={4000} />
+                  </div>
                 </div>
               )}
 

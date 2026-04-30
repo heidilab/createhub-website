@@ -38,7 +38,7 @@ export default function RotatingFounderCard({
       className="transition-opacity duration-300 ease-out"
       style={{ opacity: visible ? 1 : 0 }}
     >
-      <div className="glass-card rounded-full pl-1.5 pr-5 py-1.5 flex items-center gap-3">
+      <div className="glass-card rounded-full pl-1.5 pr-5 py-1.5 flex items-center gap-3 max-w-full">
         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-accent to-brand-dark flex items-center justify-center text-white font-bold text-[14px] flex-shrink-0 overflow-hidden">
           {m.photoUrl ? (
             <Image
@@ -52,11 +52,11 @@ export default function RotatingFounderCard({
             m.name.charAt(0)
           )}
         </div>
-        <div className="text-left min-w-0">
+        <div className="text-left min-w-0 flex-1">
           <div className="text-[12px] font-bold text-brand-dark leading-tight whitespace-nowrap">
             {m.name}
           </div>
-          <div className="text-[10px] text-brand-muted leading-tight whitespace-nowrap">
+          <div className="text-[10px] text-brand-muted leading-tight truncate lg:whitespace-nowrap">
             {m.title}
           </div>
         </div>
