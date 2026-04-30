@@ -1,0 +1,200 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #042c38;
+  --border: #e0eef2;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-feature-settings: "rlig" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  .font-serif {
+    font-feature-settings: "liga" 1, "dlig" 1;
+  }
+  h1, h2, h3, h4 {
+    @apply font-serif font-normal tracking-tight;
+  }
+}
+
+@layer components {
+  .brand-top-line {
+    @apply fixed top-0 left-0 right-0 h-[5px] bg-brand-accent z-50;
+  }
+
+  /* ─ Modern UI: Glass / Pill / Badge ─ */
+  .glass-card {
+    @apply bg-white/65 backdrop-blur-xl border border-white/70 shadow-[0_8px_30px_rgb(8,78,94,0.08)];
+  }
+  .glass-card-dark {
+    @apply bg-brand-dark/85 backdrop-blur-xl border border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.25)] text-white;
+  }
+  .pill-btn-primary {
+    @apply inline-flex items-center gap-2 bg-brand-dark text-white px-7 py-3.5 rounded-full text-[13px] font-semibold tracking-wide hover:bg-brand-text hover:shadow-lg transition;
+  }
+  .pill-btn-accent {
+    @apply inline-flex items-center gap-2 bg-brand-accent text-white px-7 py-3.5 rounded-full text-[13px] font-semibold tracking-wide hover:bg-brand-dark hover:shadow-lg transition;
+  }
+  .pill-btn-outline {
+    @apply inline-flex items-center gap-2 bg-white/80 backdrop-blur border border-brand-rule text-brand-dark px-7 py-3.5 rounded-full text-[13px] font-semibold tracking-wide hover:bg-white hover:border-brand-dark transition;
+  }
+  .pill-tag {
+    @apply inline-flex items-center bg-white/80 backdrop-blur-sm border border-brand-rule px-4 py-1.5 rounded-full text-[11px] font-semibold tracking-[0.1em] uppercase text-brand-dark shadow-sm;
+  }
+  .pill-tag-accent {
+    @apply inline-flex items-center bg-brand-accent text-white border border-brand-accent px-4 py-1.5 rounded-full text-[11px] font-semibold tracking-[0.1em] uppercase shadow-sm;
+  }
+  .pill-tag-dark {
+    @apply inline-flex items-center bg-brand-dark text-white px-4 py-1.5 rounded-full text-[11px] font-semibold tracking-[0.1em] uppercase shadow-sm;
+  }
+  .watermark-text {
+    @apply font-outfit font-black uppercase tracking-tight select-none pointer-events-none text-transparent bg-clip-text;
+    background-image: linear-gradient(180deg, rgba(8, 78, 94, 0.08) 0%, rgba(52, 204, 239, 0.04) 100%);
+  }
+  .gradient-hero {
+    background:
+      radial-gradient(ellipse at top left, rgba(168, 234, 247, 0.45) 0%, transparent 55%),
+      radial-gradient(ellipse at bottom right, rgba(52, 204, 239, 0.18) 0%, transparent 55%),
+      linear-gradient(180deg, #f6fdfe 0%, #e8f4f8 100%);
+  }
+  .gradient-soft {
+    background: linear-gradient(180deg, #f6fdfe 0%, rgba(168, 234, 247, 0.15) 100%);
+  }
+  .float-soft {
+    animation: float-soft 6s ease-in-out infinite;
+  }
+  .float-soft-delayed {
+    animation: float-soft 7s ease-in-out infinite 1.5s;
+  }
+  @keyframes float-soft {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-12px); }
+  }
+
+  /* ─ Editorial typography helpers ─ */
+  .eyebrow {
+    @apply text-[11px] tracking-[0.25em] uppercase text-brand-accent font-bold;
+  }
+  .eyebrow-muted {
+    @apply text-[11px] tracking-[0.2em] uppercase text-brand-muted font-semibold;
+  }
+  .rule-accent {
+    @apply inline-block w-9 h-[2px] bg-brand-accent;
+  }
+  .hairline {
+    @apply border-brand-hair;
+  }
+
+  /* ─ Buttons ─ */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 bg-brand-dark text-white px-6 py-3 text-sm font-bold tracking-wide hover:bg-brand-text transition-colors;
+  }
+  .btn-secondary-link {
+    @apply inline-flex items-center gap-1 text-sm font-semibold text-brand-accent border-b border-brand-accent pb-[1px] hover:text-brand-dark hover:border-brand-dark transition-colors;
+  }
+  .btn-outline {
+    @apply inline-flex items-center gap-2 border border-brand-rule px-5 py-2.5 text-sm text-brand-muted hover:text-brand-dark hover:border-brand-dark transition-colors;
+  }
+
+  /* ─ Editorial layout ─ */
+  .section-divider {
+    @apply border-b border-brand-hair;
+  }
+
+  /* ─ Tag pills ─ */
+  .tag-type {
+    @apply inline-block text-[10px] bg-brand-tag text-brand-tagText px-2 py-[2px] font-semibold tracking-wide;
+  }
+  .tag-loc {
+    @apply inline-block text-[10px] border border-brand-rule text-brand-muted px-2 py-[2px];
+  }
+
+  /* ─ Form input ─ */
+  .input {
+    @apply w-full border border-brand-rule px-3 py-2.5 text-[14px] text-brand-text bg-white placeholder:text-brand-softer/60 focus:outline-none focus:border-brand-dark focus:ring-1 focus:ring-brand-accent transition;
+  }
+  .input-error {
+    @apply border-red-400 focus:border-red-500 focus:ring-red-400;
+  }
+  textarea.input {
+    @apply resize-y min-h-[120px];
+  }
+
+  /* ─ Date block ─ */
+  .date-block {
+    @apply flex-shrink-0 w-12 text-center border border-brand-accent py-1.5;
+  }
+  .date-block-month {
+    @apply text-[10px] text-brand-accent tracking-[0.15em] uppercase font-bold;
+  }
+  .date-block-day {
+    @apply text-xl text-brand-dark font-bold leading-none mt-0.5 font-serif;
+  }
+}
+
+@layer components {
+  /* ─ Legal pages typography ─ */
+  .legal-content {
+    @apply text-[14px] text-brand-text/85 leading-[1.95];
+  }
+  .legal-content h2 {
+    @apply font-serif text-[24px] lg:text-[28px] text-brand-dark font-semibold mt-12 mb-4 first:mt-0;
+  }
+  .legal-content h3 {
+    @apply font-serif text-[18px] lg:text-[20px] text-brand-text font-semibold mt-8 mb-3;
+  }
+  .legal-content p {
+    @apply mb-4;
+  }
+  .legal-content ul {
+    @apply list-disc pl-6 mb-5 space-y-1.5;
+  }
+  .legal-content ol {
+    @apply list-decimal pl-6 mb-5 space-y-1.5;
+  }
+  .legal-content li {
+    @apply leading-[1.85];
+  }
+  .legal-content a {
+    @apply text-brand-accent underline underline-offset-2 hover:text-brand-dark;
+  }
+  .legal-content strong {
+    @apply font-semibold text-brand-dark;
+  }
+  .legal-content code {
+    @apply bg-brand-bg px-1.5 py-0.5 text-[13px] font-mono text-brand-dark rounded;
+  }
+  .legal-content blockquote {
+    @apply border-l-4 border-brand-accent bg-brand-bg/60 pl-5 py-3 my-5 italic text-brand-muted;
+  }
+  .legal-content hr {
+    @apply border-t border-brand-hair my-10;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .container-narrow {
+    @apply mx-auto max-w-5xl px-5 lg:px-8;
+  }
+  .container-wide {
+    @apply mx-auto max-w-7xl px-5 lg:px-8;
+  }
+  .container-edge {
+    @apply mx-auto max-w-[1400px];
+  }
+}

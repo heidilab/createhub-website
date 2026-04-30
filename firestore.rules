@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// 創研社 CREATE HUB — Firestore security rules
+//
+// Collections:
+//   users/{uid}                         — user profile (incl. role)
+//   events/{eventId}                    — events
+//   registrations/{regId}               — event registrations
+//   teamMembers/{memberId}              — founders/team
+//   contactInquiries/{id}               — contact form submissions
+//   newsletterSubscribers/{id}          — newsletter opt-ins
+//
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // users ─────────────────────────
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isAdmin();
+      allow create: if isSelf(uid)
+        && request.resource.data.role == 'member';
+      allow update: if (isSelf(uid)
+          && request.resource.data.role == resource.data.role)  // non-admins cannot self-promote
+        || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // events ────────────────────────
+    match /events/{eventId} {
+      allow read: if resource.data.isPublished == true || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // registrations ─────────────────
+    match /registrations/{regId} {
+      allow read: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // team members ──────────────────
+    match /teamMembers/{memberId} {
+      allow read: if resource.data.isVisible == true || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // contact inquiries ─────────────
+    match /contactInquiries/{id} {
+      allow create: if true;         // public form
+      allow read, update, delete: if isAdmin();
+    }
+
+    // newsletter subscribers ────────
+    match /newsletterSubscribers/{id} {
+      allow create: if true;         // public subscribe
+      allow read, update, delete: if isAdmin();
+    }
+
+    // articles (商業快訊) ────────────
+    match /articles/{id} {
+      allow read: if resource.data.isPublished == true || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}
