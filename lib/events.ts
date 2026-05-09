@@ -1,9 +1,82 @@
 import { adminDb } from "@/lib/firebase/admin";
 import { serializeDate } from "@/lib/serialize";
-import type { Event } from "@/types";
+import type { Event, EventSession, Speaker } from "@/types";
+
+function normalizeSpeakers(data: FirebaseFirestore.DocumentData): Speaker[] {
+  if (Array.isArray(data.speakers) && data.speakers.length > 0) {
+    return data.speakers
+      .filter((s: unknown): s is Record<string, unknown> => !!s && typeof s === "object")
+      .map((s: Record<string, unknown>) => ({
+        name: (s.name as string) ?? "",
+        bio: (s.bio as string) ?? undefined,
+        photoUrl: (s.photoUrl as string) ?? undefined,
+      }))
+      .filter((s: Speaker) => s.name.length > 0);
+  }
+  if (data.speakerName) {
+    return [
+      {
+        name: data.speakerName,
+        bio: data.speakerBio ?? undefined,
+      },
+    ];
+  }
+  return [];
+}
+
+function normalizeSpeakerEmails(data: FirebaseFirestore.DocumentData): string[] {
+  if (Array.isArray(data.speakerEmails)) {
+    return data.speakerEmails
+      .filter((e: unknown): e is string => typeof e === "string")
+      .map((e) => e.trim())
+      .filter((e) => e.length > 0);
+  }
+  return [];
+}
+
+function normalizeSessions(data: FirebaseFirestore.DocumentData): EventSession[] {
+  if (Array.isArray(data.sessions) && data.sessions.length > 0) {
+    return data.sessions
+      .filter((s: unknown): s is Record<string, unknown> => !!s && typeof s === "object")
+      .map((s: Record<string, unknown>, idx: number) => ({
+        id: (s.id as string) || `session-${idx + 1}`,
+        startDate: serializeDate(s.startDate) ?? "",
+        endDate: serializeDate(s.endDate) ?? undefined,
+        location: (s.location as string) ?? undefined,
+        zoomLink: (s.zoomLink as string) ?? undefined,
+        capacity:
+          typeof s.capacity === "number" && s.capacity > 0
+            ? s.capacity
+            : undefined,
+      }))
+      .filter((s: EventSession) => s.startDate);
+  }
+  // Back-compat: synthesize a single session from flat fields.
+  if (data.eventDate) {
+    return [
+      {
+        id: "default",
+        startDate: serializeDate(data.eventDate) ?? "",
+        endDate: serializeDate(data.endDate) ?? undefined,
+        location: data.location ?? undefined,
+        zoomLink: data.zoomLink ?? undefined,
+        capacity:
+          typeof data.capacity === "number" && data.capacity > 0
+            ? data.capacity
+            : undefined,
+      },
+    ];
+  }
+  return [];
+}
 
 function docToEvent(doc: FirebaseFirestore.DocumentSnapshot): Event {
   const data = doc.data()!;
+  const sessions = normalizeSessions(data);
+  const speakers = normalizeSpeakers(data);
+  const speakerEmails = normalizeSpeakerEmails(data);
+  const firstSession = sessions[0];
+
   return {
     id: doc.id,
     title: data.title ?? "",
@@ -12,20 +85,25 @@ function docToEvent(doc: FirebaseFirestore.DocumentSnapshot): Event {
     coverImage: data.coverImage ?? undefined,
     eventType: data.eventType ?? "offline",
     category: data.category ?? "lecture",
-    speakerName: data.speakerName ?? undefined,
-    speakerBio: data.speakerBio ?? undefined,
-    eventDate: serializeDate(data.eventDate) ?? "",
-    endDate: serializeDate(data.endDate) ?? undefined,
-    location: data.location ?? undefined,
-    zoomLink: data.zoomLink ?? undefined,
+    speakers,
+    speakerEmails,
+    sessions,
+    // Mirrored "primary" fields — derived from first session, kept for sort/query compat.
+    eventDate: firstSession?.startDate ?? serializeDate(data.eventDate) ?? "",
+    endDate: firstSession?.endDate ?? serializeDate(data.endDate) ?? undefined,
+    location: firstSession?.location ?? data.location ?? undefined,
+    zoomLink: firstSession?.zoomLink ?? data.zoomLink ?? undefined,
+    capacity: firstSession?.capacity ?? data.capacity ?? undefined,
     isFree: data.isFree ?? true,
     priceHkd: data.priceHkd ?? 0,
-    capacity: data.capacity ?? undefined,
     status: data.status ?? "upcoming",
     isPublished: data.isPublished ?? false,
     registrationCount: data.registrationCount ?? undefined,
     createdAt: serializeDate(data.createdAt) ?? undefined,
     updatedAt: serializeDate(data.updatedAt) ?? undefined,
+    // Legacy mirrors (read-only, surfaced for any callers still using them)
+    speakerName: speakers[0]?.name,
+    speakerBio: speakers[0]?.bio,
   };
 }
 
@@ -91,4 +169,12 @@ export async function getEventById(id: string): Promise<Event | null> {
     console.warn("[getEventById] Firestore not ready:", err);
     return null;
   }
+}
+
+export function findSession(
+  event: Event,
+  sessionId: string | null | undefined
+): EventSession | null {
+  if (!sessionId) return event.sessions[0] ?? null;
+  return event.sessions.find((s) => s.id === sessionId) ?? null;
 }

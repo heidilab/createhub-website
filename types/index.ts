@@ -9,6 +9,21 @@ export type UserRole = "member" | "admin";
 
 export type FirestoreDate = Timestamp | Date | string | { seconds: number };
 
+export interface Speaker {
+  name: string;
+  bio?: string;
+  photoUrl?: string;
+}
+
+export interface EventSession {
+  id: string;
+  startDate: FirestoreDate;
+  endDate?: FirestoreDate;
+  location?: string;
+  zoomLink?: string;
+  capacity?: number;
+}
+
 export interface Event {
   id: string;
   title: string;
@@ -17,8 +32,9 @@ export interface Event {
   coverImage?: string;
   eventType: EventType;
   category: EventCategory;
-  speakerName?: string;
-  speakerBio?: string;
+  speakers: Speaker[];
+  speakerEmails: string[];
+  sessions: EventSession[];
   eventDate: FirestoreDate;
   endDate?: FirestoreDate;
   location?: string;
@@ -31,11 +47,14 @@ export interface Event {
   registrationCount?: number;
   createdAt?: FirestoreDate;
   updatedAt?: FirestoreDate;
+  speakerName?: string;
+  speakerBio?: string;
 }
 
 export interface EventRegistration {
   id: string;
   eventId: string;
+  sessionId: string;
   userId: string;
   userEmail: string;
   userName: string;

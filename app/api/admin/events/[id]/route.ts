@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/firebase/session";
 import { adminDb } from "@/lib/firebase/admin";
+import { buildEventDoc } from "../shared";
 
 async function assertAdmin() {
   const user = await getSessionUser();
@@ -17,37 +18,20 @@ export async function PATCH(
   try {
     await assertAdmin();
     const body = await req.json();
+
+    const built = buildEventDoc(body, { isCreate: false });
+    if ("error" in built) {
+      return NextResponse.json({ error: built.error }, { status: 400 });
+    }
+
     const update: Record<string, unknown> = {
+      ...built.data,
       updatedAt: new Date(),
     };
 
-    const fields = [
-      "title",
-      "slug",
-      "description",
-      "coverImage",
-      "eventType",
-      "category",
-      "speakerName",
-      "speakerBio",
-      "location",
-      "zoomLink",
-      "isFree",
-      "priceHkd",
-      "capacity",
-      "status",
-      "isPublished",
-    ] as const;
-
-    for (const f of fields) {
-      if (f in body) update[f] = body[f];
+    if (typeof body.slug === "string" && body.slug) {
+      update.slug = body.slug;
     }
-    if (body.eventDate) update.eventDate = new Date(body.eventDate);
-    if (body.endDate) update.endDate = new Date(body.endDate);
-    else if ("endDate" in body) update.endDate = null;
-    if ("capacity" in body)
-      update.capacity = body.capacity ? Number(body.capacity) : null;
-    if ("priceHkd" in body) update.priceHkd = Number(body.priceHkd) || 0;
 
     await adminDb().collection("events").doc(params.id).update(update);
     return NextResponse.json({ ok: true });

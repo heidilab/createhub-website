@@ -27,17 +27,18 @@ export default async function DashboardPage() {
 
   const registrations = await getUserRegistrations(sessionUser.uid);
   const now = Date.now();
+  // Use the user's specific registered-session date, not the event's first-session date,
+  // so a user registered for session 2 of a multi-session event still shows in upcoming
+  // even after session 1 has passed.
+  const sessionTime = (r: (typeof registrations)[number]): number =>
+    toDate(r.registeredSession?.startDate ?? r.event?.eventDate)?.getTime() ?? 0;
+
   const upcoming = registrations.filter(
-    (r) =>
-      r.event &&
-      r.status === "confirmed" &&
-      (toDate(r.event.eventDate)?.getTime() ?? 0) >= now
+    (r) => r.event && r.status === "confirmed" && sessionTime(r) >= now
   );
   const past = registrations.filter(
     (r) =>
-      r.event &&
-      (r.status === "cancelled" ||
-        (toDate(r.event.eventDate)?.getTime() ?? 0) < now)
+      r.event && (r.status === "cancelled" || sessionTime(r) < now)
   );
 
   return (
@@ -124,7 +125,15 @@ export default async function DashboardPage() {
             {upcoming.length > 0 ? (
               <div className="space-y-4">
                 {upcoming.map((r) =>
-                  r.event ? <RegistrationCard key={r.id} event={r.event} /> : null
+                  r.event ? (
+                    <RegistrationCard
+                      key={r.id}
+                      event={r.event}
+                      sessionDate={r.registeredSession?.startDate}
+                      sessionLocation={r.registeredSession?.location}
+                      hasMultipleSessions={(r.event.sessions?.length ?? 0) > 1}
+                    />
+                  ) : null
                 )}
               </div>
             ) : (
@@ -157,6 +166,9 @@ export default async function DashboardPage() {
                     <RegistrationCard
                       key={r.id}
                       event={r.event}
+                      sessionDate={r.registeredSession?.startDate}
+                      sessionLocation={r.registeredSession?.location}
+                      hasMultipleSessions={(r.event.sessions?.length ?? 0) > 1}
                       cancelled={r.status === "cancelled"}
                       compact
                     />
@@ -193,6 +205,9 @@ function ProfileRow({
 
 function RegistrationCard({
   event,
+  sessionDate,
+  sessionLocation,
+  hasMultipleSessions,
   cancelled,
   compact,
 }: {
@@ -207,9 +222,14 @@ function RegistrationCard({
     isFree: boolean;
     priceHkd: number;
   };
+  sessionDate?: unknown;
+  sessionLocation?: string;
+  hasMultipleSessions?: boolean;
   cancelled?: boolean;
   compact?: boolean;
 }) {
+  const displayDate = sessionDate ?? event.eventDate;
+  const displayLocation = sessionLocation ?? event.location;
   return (
     <Link
       href={`/events/${event.id}`}
@@ -245,6 +265,11 @@ function RegistrationCard({
         <div className="flex items-center gap-2 mb-1.5">
           <span className="pill-tag-accent">{categoryLabel(event.category)}</span>
           <span className="pill-tag">{eventTypeLabel(event.eventType)}</span>
+          {hasMultipleSessions && !cancelled && (
+            <span className="inline-flex items-center bg-brand-bg text-brand-dark border border-brand-rule px-2.5 py-[2px] rounded-full text-[10px] font-semibold tracking-wider">
+              你揀咗呢場
+            </span>
+          )}
           {cancelled && (
             <span className="inline-flex items-center bg-red-50 text-red-700 px-2.5 py-[2px] rounded-full text-[10px] font-semibold tracking-wider">
               已取消
@@ -261,12 +286,12 @@ function RegistrationCard({
         <div className="flex items-center gap-3 text-[12px] text-brand-softer mt-2">
           <span className="flex items-center gap-1">
             <CalendarDays className="w-3 h-3" />
-            {formatEventDate(event.eventDate as never)}
+            {formatEventDate(displayDate as never)}
           </span>
-          {event.eventType !== "online" && event.location && (
+          {event.eventType !== "online" && displayLocation && (
             <span className="flex items-center gap-1 truncate">
               <MapPin className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">{event.location}</span>
+              <span className="truncate">{displayLocation}</span>
             </span>
           )}
           {event.eventType === "online" && (

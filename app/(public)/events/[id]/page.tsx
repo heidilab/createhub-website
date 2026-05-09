@@ -7,10 +7,12 @@ import {
   MapPin,
   Video,
   Users2,
-  Ticket,
 } from "lucide-react";
 import { getEventById } from "@/lib/events";
-import { hasUserRegistered } from "@/lib/registrations";
+import {
+  getSessionRegistrationCounts,
+  getUserRegisteredSessionIds,
+} from "@/lib/registrations";
 import { getSessionUser } from "@/lib/firebase/session";
 import { toDate, formatEventDate } from "@/lib/date";
 import { categoryLabel, eventTypeLabel } from "@/lib/utils";
@@ -37,27 +39,45 @@ export default async function EventDetailPage({
   const event = await getEventById(params.id);
   if (!event || !event.isPublished) notFound();
 
-  const session = await getSessionUser();
-  const alreadyRegistered = session
-    ? await hasUserRegistered(session.uid, event.id)
-    : false;
+  const [session, sessionCounts] = await Promise.all([
+    getSessionUser(),
+    getSessionRegistrationCounts(event.id),
+  ]);
 
-  const startDate = toDate(event.eventDate);
-  const endDate = toDate(event.endDate);
+  const userRegisteredSessionIds = session
+    ? await getUserRegisteredSessionIds(session.uid, event.id)
+    : new Set<string>();
+
+  // Build session view-models
+  const sessionVMs = event.sessions.map((s) => {
+    const count = sessionCounts[s.id] ?? 0;
+    const isFull = !!(s.capacity && count >= s.capacity);
+    const isRegistered = userRegisteredSessionIds.has(s.id);
+    const seatsRemaining = s.capacity ? Math.max(s.capacity - count, 0) : null;
+    return { ...s, count, isFull, isRegistered, seatsRemaining };
+  });
+
+  const allFull = sessionVMs.length > 0 && sessionVMs.every((s) => s.isFull);
+
+  const firstSession = event.sessions[0];
+  const firstSessionStart = toDate(firstSession?.startDate);
+  const firstSessionEnd = toDate(firstSession?.endDate);
 
   const schema = eventJsonLd({
     id: event.id,
     title: event.title,
     description: event.description,
-    eventDateIso: startDate?.toISOString() ?? "",
-    endDateIso: endDate?.toISOString(),
-    location: event.location,
+    eventDateIso: firstSessionStart?.toISOString() ?? "",
+    endDateIso: firstSessionEnd?.toISOString(),
+    location: firstSession?.location,
     eventType: event.eventType,
-    speakerName: event.speakerName,
+    speakerName: event.speakers[0]?.name,
     isFree: event.isFree,
     priceHkd: event.priceHkd,
     coverImage: event.coverImage,
   });
+
+  const hasMultipleSessions = sessionVMs.length > 1;
 
   return (
     <>
@@ -96,134 +116,193 @@ export default async function EventDetailPage({
 
       <div className="gradient-soft py-10">
         <div className="container-wide px-5 lg:px-8 grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-14">
-        {/* Left — content */}
-        <div className="lg:col-span-2">
-          <div className="flex flex-wrap gap-2 mb-5">
-            <span className="pill-tag-accent">{categoryLabel(event.category)}</span>
-            <span className="pill-tag">{eventTypeLabel(event.eventType)}</span>
-            {!event.isFree && (
-              <span className="pill-tag-dark">HK${event.priceHkd.toLocaleString()}</span>
-            )}
-          </div>
-
-          <h1 className="font-serif text-[36px] sm:text-[42px] lg:text-[54px] leading-[1.1] text-brand-text mb-8">
-            {event.title}
-          </h1>
-
-          <div className="glass-card rounded-3xl p-7 space-y-4 mb-8">
-            <InfoRow
-              icon={<CalendarDays className="w-4 h-4" />}
-              label="日期時間"
-              value={
-                startDate
-                  ? endDate
-                    ? `${formatEventDate(event.eventDate)} — ${endDate.getHours()}:${String(endDate.getMinutes()).padStart(2, "0")}`
-                    : formatEventDate(event.eventDate)
-                  : "—"
-              }
-            />
-            {event.eventType === "online" ? (
-              <InfoRow
-                icon={<Video className="w-4 h-4" />}
-                label="地點"
-                value="線上活動（Zoom 連結將於報名確認信寄出）"
-              />
-            ) : (
-              event.location && (
-                <InfoRow
-                  icon={<MapPin className="w-4 h-4" />}
-                  label="地點"
-                  value={event.location}
-                />
-              )
-            )}
-            {event.speakerName && (
-              <InfoRow
-                icon={<Users2 className="w-4 h-4" />}
-                label="講師"
-                value={event.speakerName}
-              />
-            )}
-            {event.capacity && (
-              <InfoRow
-                icon={<Ticket className="w-4 h-4" />}
-                label="名額"
-                value={`${event.capacity} 位`}
-              />
-            )}
-          </div>
-
-          {/* Description */}
-          <div className="glass-card rounded-3xl p-7 lg:p-9">
-            <div className="pill-tag-accent inline-flex mb-4">活動內容</div>
-            <div className="prose prose-sm max-w-none text-[15px] text-brand-text/85 leading-[1.95] whitespace-pre-wrap">
-              {event.description || "活動詳情陸續公布。"}
+          {/* Left — content */}
+          <div className="lg:col-span-2">
+            <div className="flex flex-wrap gap-2 mb-5">
+              <span className="pill-tag-accent">
+                {categoryLabel(event.category)}
+              </span>
+              <span className="pill-tag">{eventTypeLabel(event.eventType)}</span>
+              {!event.isFree && (
+                <span className="pill-tag-dark">
+                  HK${event.priceHkd.toLocaleString()}
+                </span>
+              )}
             </div>
+
+            <h1 className="font-serif text-[36px] sm:text-[42px] lg:text-[54px] leading-[1.1] text-brand-text mb-8">
+              {event.title}
+            </h1>
+
+            {/* Sessions list */}
+            <div className="glass-card rounded-3xl p-7 mb-8">
+              <div className="flex items-center gap-2 mb-5">
+                <CalendarDays className="w-4 h-4 text-brand-accent" />
+                <div className="text-[10px] text-brand-softer tracking-[0.2em] uppercase">
+                  {hasMultipleSessions ? `共 ${sessionVMs.length} 場次` : "日期時間"}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {sessionVMs.map((s, idx) => (
+                  <div
+                    key={s.id}
+                    className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border ${
+                      s.isFull
+                        ? "border-brand-hair bg-brand-bg/60 opacity-70"
+                        : "border-brand-rule bg-white"
+                    }`}
+                  >
+                    <div className="flex-1">
+                      {hasMultipleSessions && (
+                        <div className="text-[10px] text-brand-accent font-bold tracking-[0.2em] uppercase mb-1">
+                          第 {idx + 1} 場
+                        </div>
+                      )}
+                      <div className="text-[14px] text-brand-text font-semibold mb-0.5">
+                        {formatEventDate(s.startDate)}
+                        {s.endDate && (
+                          <>
+                            {" "}
+                            —{" "}
+                            {`${toDate(s.endDate)?.getHours() ?? 0}:${String(
+                              toDate(s.endDate)?.getMinutes() ?? 0
+                            ).padStart(2, "0")}`}
+                          </>
+                        )}
+                      </div>
+                      {event.eventType !== "online" && s.location && (
+                        <div className="text-[12px] text-brand-softer flex items-center gap-1.5">
+                          <MapPin className="w-3 h-3" />
+                          {s.location}
+                        </div>
+                      )}
+                      {event.eventType === "online" && (
+                        <div className="text-[12px] text-brand-softer flex items-center gap-1.5">
+                          <Video className="w-3 h-3" />
+                          線上活動（Zoom 連結將於確認信寄出）
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 sm:flex-col sm:items-end">
+                      {s.isRegistered ? (
+                        <span className="pill-tag-accent text-[10px]">
+                          已報名
+                        </span>
+                      ) : s.isFull ? (
+                        <span className="inline-flex items-center px-2.5 py-1 text-[10px] font-bold tracking-[0.15em] uppercase bg-red-50 text-red-700 border border-red-200">
+                          已滿額
+                        </span>
+                      ) : s.seatsRemaining !== null ? (
+                        <span className="text-[11px] text-brand-muted">
+                          剩餘 {s.seatsRemaining} / {s.capacity} 個名額
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-brand-softer">
+                          名額不限
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="glass-card rounded-3xl p-7 lg:p-9">
+              <div className="pill-tag-accent inline-flex mb-4">活動內容</div>
+              <div className="prose prose-sm max-w-none text-[15px] text-brand-text/85 leading-[1.95] whitespace-pre-wrap">
+                {event.description || "活動詳情陸續公布。"}
+              </div>
+            </div>
+
+            {/* Speakers */}
+            {event.speakers.length > 0 && (
+              <div className="glass-card rounded-3xl p-7 lg:p-9 mt-6">
+                <div className="pill-tag inline-flex mb-5">
+                  {event.speakers.length > 1 ? "講師團隊" : "講師簡介"}
+                </div>
+                <div className="space-y-7">
+                  {event.speakers.map((sp, idx) => (
+                    <div
+                      key={`${sp.name}-${idx}`}
+                      className="flex flex-col sm:flex-row gap-5 sm:items-start"
+                    >
+                      <div className="flex-shrink-0 mx-auto sm:mx-0">
+                        {sp.photoUrl ? (
+                          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-2 border-brand-accent/20">
+                            <Image
+                              src={sp.photoUrl}
+                              alt={sp.name}
+                              fill
+                              sizes="112px"
+                              className="object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-brand-dark/10 flex items-center justify-center">
+                            <Users2 className="w-8 h-8 text-brand-dark/40" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 text-center sm:text-left">
+                        <h3 className="font-serif text-[22px] lg:text-[26px] text-brand-dark mb-2">
+                          {sp.name}
+                        </h3>
+                        {sp.bio && (
+                          <p className="text-[14px] text-brand-muted leading-[1.85] whitespace-pre-wrap">
+                            {sp.bio}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Speaker */}
-          {event.speakerBio && (
-            <div className="glass-card rounded-3xl p-7 lg:p-9 mt-6">
-              <div className="pill-tag inline-flex mb-4">講師簡介</div>
-              <h3 className="font-serif text-[24px] lg:text-[28px] text-brand-dark mb-4">
-                {event.speakerName}
-              </h3>
-              <p className="text-[14px] text-brand-muted leading-[1.95] whitespace-pre-wrap">
-                {event.speakerBio}
-              </p>
-            </div>
-          )}
-        </div>
+          {/* Right — registration */}
+          <aside className="lg:col-span-1">
+            <div className="sticky top-28">
+              <RegistrationForm
+                eventId={event.id}
+                eventTitle={event.title}
+                isFree={event.isFree}
+                priceHkd={event.priceHkd}
+                sessions={sessionVMs.map((s) => ({
+                  id: s.id,
+                  startDate:
+                    typeof s.startDate === "string"
+                      ? s.startDate
+                      : toDate(s.startDate)?.toISOString() ?? "",
+                  location: s.location ?? null,
+                  isFull: s.isFull,
+                  isRegistered: s.isRegistered,
+                  seatsRemaining: s.seatsRemaining,
+                  capacity: s.capacity ?? null,
+                }))}
+                allFull={allFull}
+              />
 
-        {/* Right — registration */}
-        <aside className="lg:col-span-1">
-          <div className="sticky top-28">
-            <RegistrationForm
-              eventId={event.id}
-              eventTitle={event.title}
-              isFree={event.isFree}
-              priceHkd={event.priceHkd}
-              alreadyRegistered={alreadyRegistered}
-            />
-
-            <div className="mt-6 glass-card rounded-2xl p-5">
-              <div className="pill-tag inline-flex mb-3 text-[10px]">有問題？</div>
-              <p className="text-[12px] text-brand-softer leading-relaxed mb-3">
-                如需取消報名或有其他查詢，請聯絡我哋。
-              </p>
-              <a
-                href="mailto:info@createhub.biz"
-                className="text-[12px] font-bold text-brand-accent border-b border-brand-accent hover:text-brand-dark hover:border-brand-dark"
-              >
-                info@createhub.biz
-              </a>
+              <div className="mt-6 glass-card rounded-2xl p-5">
+                <div className="pill-tag inline-flex mb-3 text-[10px]">
+                  有問題？
+                </div>
+                <p className="text-[12px] text-brand-softer leading-relaxed mb-3">
+                  如需取消報名或有其他查詢，請聯絡我哋。
+                </p>
+                <a
+                  href="mailto:info@createhub.biz"
+                  className="text-[12px] font-bold text-brand-accent border-b border-brand-accent hover:text-brand-dark hover:border-brand-dark"
+                >
+                  info@createhub.biz
+                </a>
+              </div>
             </div>
-          </div>
-        </aside>
+          </aside>
         </div>
       </div>
     </>
-  );
-}
-
-function InfoRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <div className="text-brand-accent mt-0.5">{icon}</div>
-      <div className="flex-1">
-        <div className="text-[10px] text-brand-softer tracking-[0.2em] uppercase mb-0.5">
-          {label}
-        </div>
-        <div className="text-[14px] text-brand-text">{value}</div>
-      </div>
-    </div>
   );
 }

@@ -3,9 +3,17 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Upload, Save, Trash2, Loader2 } from "lucide-react";
+import {
+  Upload,
+  Save,
+  Trash2,
+  Loader2,
+  Plus,
+  X,
+  GripVertical,
+} from "lucide-react";
 import { slugify } from "@/lib/utils";
-import type { Event } from "@/types";
+import type { Event, Speaker, EventSession } from "@/types";
 import { toDate } from "@/lib/date";
 
 function toLocalInput(d: Date | null): string {
@@ -16,6 +24,59 @@ function toLocalInput(d: Date | null): string {
   )}:${pad(d.getMinutes())}`;
 }
 
+function newId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2);
+}
+
+interface SpeakerDraft extends Speaker {
+  _key: string;
+}
+
+interface SessionDraft {
+  _key: string;
+  id: string;
+  startDate: string; // datetime-local
+  endDate: string;
+  location: string;
+  zoomLink: string;
+  capacity: string; // string in form, parsed on submit
+}
+
+function speakersFromInitial(initial?: Event): SpeakerDraft[] {
+  if (initial?.speakers && initial.speakers.length > 0) {
+    return initial.speakers.map((s) => ({ ...s, _key: newId() }));
+  }
+  return [{ _key: newId(), name: "", bio: "", photoUrl: "" }];
+}
+
+function sessionsFromInitial(initial?: Event): SessionDraft[] {
+  if (initial?.sessions && initial.sessions.length > 0) {
+    return initial.sessions.map((s) => ({
+      _key: newId(),
+      id: s.id,
+      startDate: toLocalInput(toDate(s.startDate ?? null)),
+      endDate: toLocalInput(toDate(s.endDate ?? null)),
+      location: s.location ?? "",
+      zoomLink: s.zoomLink ?? "",
+      capacity: s.capacity ? String(s.capacity) : "",
+    }));
+  }
+  return [
+    {
+      _key: newId(),
+      id: newId(),
+      startDate: "",
+      endDate: "",
+      location: "",
+      zoomLink: "",
+      capacity: "",
+    },
+  ];
+}
+
 interface Props {
   mode: "create" | "edit";
   initial?: Event;
@@ -23,7 +84,7 @@ interface Props {
 
 export default function EventForm({ mode, initial }: Props) {
   const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     title: initial?.title ?? "",
@@ -32,19 +93,27 @@ export default function EventForm({ mode, initial }: Props) {
     coverImage: initial?.coverImage ?? "",
     eventType: initial?.eventType ?? "offline",
     category: initial?.category ?? "lecture",
-    speakerName: initial?.speakerName ?? "",
-    speakerBio: initial?.speakerBio ?? "",
-    eventDate: toLocalInput(toDate(initial?.eventDate ?? null)),
-    endDate: toLocalInput(toDate(initial?.endDate ?? null)),
-    location: initial?.location ?? "",
-    zoomLink: initial?.zoomLink ?? "",
     isFree: initial?.isFree ?? true,
     priceHkd: initial?.priceHkd ?? 0,
-    capacity: initial?.capacity ?? 0,
     status: initial?.status ?? "upcoming",
     isPublished: initial?.isPublished ?? false,
   });
-  const [uploading, setUploading] = useState(false);
+
+  const [speakers, setSpeakers] = useState<SpeakerDraft[]>(
+    speakersFromInitial(initial)
+  );
+  const [speakerEmailInput, setSpeakerEmailInput] = useState("");
+  const [speakerEmails, setSpeakerEmails] = useState<string[]>(
+    initial?.speakerEmails ?? []
+  );
+  const [sessions, setSessions] = useState<SessionDraft[]>(
+    sessionsFromInitial(initial)
+  );
+
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingSpeakerKey, setUploadingSpeakerKey] = useState<string | null>(
+    null
+  );
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -61,44 +130,172 @@ export default function EventForm({ mode, initial }: Props) {
     }
   };
 
-  const handleFile = async (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      setError("只接受圖片檔案");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setError("圖片大小不能超過 5MB");
-      return;
-    }
-    setUploading(true);
+  // ── Image uploads ───────────────────────────────────────────
+  const uploadImage = async (file: File): Promise<string> => {
+    if (!file.type.startsWith("image/")) throw new Error("只接受圖片檔案");
+    if (file.size > 5 * 1024 * 1024) throw new Error("圖片大小不能超過 5MB");
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("folder", "events");
+    const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "上傳失敗");
+    return data.url as string;
+  };
+
+  const handleCoverFile = async (file: File) => {
+    setUploadingCover(true);
     setError("");
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("folder", "events");
-      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "上傳失敗");
-      updateField("coverImage", data.url);
+      const url = await uploadImage(file);
+      updateField("coverImage", url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "上傳失敗");
     } finally {
-      setUploading(false);
+      setUploadingCover(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
+  const handleSpeakerPhoto = async (key: string, file: File) => {
+    setUploadingSpeakerKey(key);
     setError("");
     try {
-      const payload = {
-        ...form,
-        eventDate: new Date(form.eventDate).toISOString(),
-        endDate: form.endDate ? new Date(form.endDate).toISOString() : null,
-        priceHkd: Number(form.priceHkd) || 0,
-        capacity: Number(form.capacity) || null,
-      };
+      const url = await uploadImage(file);
+      setSpeakers((arr) =>
+        arr.map((s) => (s._key === key ? { ...s, photoUrl: url } : s))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "上傳失敗");
+    } finally {
+      setUploadingSpeakerKey(null);
+    }
+  };
+
+  // ── Speakers ────────────────────────────────────────────────
+  const addSpeaker = () =>
+    setSpeakers((arr) => [
+      ...arr,
+      { _key: newId(), name: "", bio: "", photoUrl: "" },
+    ]);
+  const removeSpeaker = (key: string) =>
+    setSpeakers((arr) =>
+      arr.length > 1 ? arr.filter((s) => s._key !== key) : arr
+    );
+  const updateSpeaker = (key: string, patch: Partial<Speaker>) =>
+    setSpeakers((arr) =>
+      arr.map((s) => (s._key === key ? { ...s, ...patch } : s))
+    );
+
+  // ── Speaker emails ──────────────────────────────────────────
+  const commitSpeakerEmail = () => {
+    const raw = speakerEmailInput.trim();
+    if (!raw) return;
+    // Allow comma- or space-separated
+    const candidates = raw
+      .split(/[,;\s]+/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const valid = candidates.filter((e) => emailRe.test(e));
+    const invalid = candidates.filter((e) => !emailRe.test(e));
+    if (invalid.length > 0) {
+      setError(`電郵格式無效：${invalid.join(", ")}`);
+      return;
+    }
+    setSpeakerEmails((arr) =>
+      Array.from(new Set([...arr, ...valid].map((e) => e.toLowerCase())))
+    );
+    setSpeakerEmailInput("");
+    setError("");
+  };
+  const removeSpeakerEmail = (email: string) =>
+    setSpeakerEmails((arr) => arr.filter((e) => e !== email));
+
+  // ── Sessions ────────────────────────────────────────────────
+  const addSession = () =>
+    setSessions((arr) => [
+      ...arr,
+      {
+        _key: newId(),
+        id: newId(),
+        startDate: "",
+        endDate: "",
+        location: "",
+        zoomLink: "",
+        capacity: "",
+      },
+    ]);
+  const removeSession = (key: string) =>
+    setSessions((arr) =>
+      arr.length > 1 ? arr.filter((s) => s._key !== key) : arr
+    );
+  const updateSession = (key: string, patch: Partial<SessionDraft>) =>
+    setSessions((arr) =>
+      arr.map((s) => (s._key === key ? { ...s, ...patch } : s))
+    );
+
+  // ── Submit ──────────────────────────────────────────────────
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    // Validate at least one speaker name
+    const validSpeakers = speakers
+      .map((s) => ({
+        name: s.name.trim(),
+        bio: s.bio?.trim() || undefined,
+        photoUrl: s.photoUrl?.trim() || undefined,
+      }))
+      .filter((s) => s.name.length > 0);
+    if (validSpeakers.length === 0) {
+      setError("最少要有一位講師（請填寫姓名）");
+      return;
+    }
+
+    // Validate sessions
+    if (sessions.length === 0) {
+      setError("最少要有一個活動場次");
+      return;
+    }
+    for (let idx = 0; idx < sessions.length; idx++) {
+      const s = sessions[idx];
+      if (!s.startDate) {
+        setError(`第 ${idx + 1} 場：請填寫開始時間`);
+        return;
+      }
+      if (form.eventType !== "online" && !s.location.trim()) {
+        setError(`第 ${idx + 1} 場：請填寫地點`);
+        return;
+      }
+    }
+
+    const sessionsPayload = sessions.map((s) => ({
+      id: s.id,
+      startDate: new Date(s.startDate).toISOString(),
+      endDate: s.endDate ? new Date(s.endDate).toISOString() : null,
+      location: s.location.trim() || null,
+      zoomLink: s.zoomLink.trim() || null,
+      capacity: s.capacity ? Number(s.capacity) : null,
+    }));
+
+    const payload = {
+      title: form.title,
+      slug: form.slug,
+      description: form.description,
+      coverImage: form.coverImage || null,
+      eventType: form.eventType,
+      category: form.category,
+      speakers: validSpeakers,
+      speakerEmails,
+      sessions: sessionsPayload,
+      isFree: form.isFree,
+      priceHkd: Number(form.priceHkd) || 0,
+      status: form.status,
+      isPublished: form.isPublished,
+    };
+
+    setSaving(true);
+    try {
       const res = await fetch(
         mode === "create"
           ? "/api/admin/events"
@@ -152,10 +349,7 @@ export default function EventForm({ mode, initial }: Props) {
           />
         </Field>
 
-        <Field
-          label="Slug（URL 識別碼）"
-          hint="自動由名稱生成，可手動修改"
-        >
+        <Field label="Slug（URL 識別碼）" hint="自動由名稱生成，可手動修改">
           <input
             type="text"
             value={form.slug}
@@ -197,16 +391,16 @@ export default function EventForm({ mode, initial }: Props) {
         ) : (
           <label className="block border-2 border-dashed border-brand-rule py-10 text-center cursor-pointer hover:border-brand-accent transition">
             <input
-              ref={fileInputRef}
+              ref={coverInputRef}
               type="file"
               accept="image/*"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) handleFile(f);
+                if (f) handleCoverFile(f);
               }}
             />
-            {uploading ? (
+            {uploadingCover ? (
               <>
                 <Loader2 className="w-6 h-6 mx-auto mb-2 text-brand-accent animate-spin" />
                 <div className="text-[12px] text-brand-softer">上傳中…</div>
@@ -214,8 +408,12 @@ export default function EventForm({ mode, initial }: Props) {
             ) : (
               <>
                 <Upload className="w-6 h-6 mx-auto mb-2 text-brand-accent" />
-                <div className="text-[13px] text-brand-muted mb-1">撳呢度上傳封面圖</div>
-                <div className="text-[10px] text-brand-softer">JPG / PNG · 最大 5MB · 建議 1600×900</div>
+                <div className="text-[13px] text-brand-muted mb-1">
+                  撳呢度上傳封面圖
+                </div>
+                <div className="text-[10px] text-brand-softer">
+                  JPG / PNG · 最大 5MB · 建議 1600×900
+                </div>
               </>
             )}
           </label>
@@ -256,77 +454,287 @@ export default function EventForm({ mode, initial }: Props) {
         </div>
       </Section>
 
-      {/* Datetime */}
-      <Section title="時間與地點">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <Field label="活動開始時間" required>
-            <input
-              type="datetime-local"
-              required
-              value={form.eventDate}
-              onChange={(e) => updateField("eventDate", e.target.value)}
-              className="input"
-            />
-          </Field>
-          <Field label="活動結束時間" hint="選填">
-            <input
-              type="datetime-local"
-              value={form.endDate}
-              onChange={(e) => updateField("endDate", e.target.value)}
-              className="input"
-            />
-          </Field>
-        </div>
-
-        {form.eventType !== "online" && (
-          <Field label="地點" required={form.eventType === "offline"}>
-            <input
-              type="text"
-              value={form.location}
-              onChange={(e) => updateField("location", e.target.value)}
-              className="input"
-              placeholder="例：灣仔 xxx 中心 8 樓"
-            />
-          </Field>
-        )}
-        {form.eventType !== "offline" && (
-          <Field
-            label="Zoom 連結"
-            hint="會喺報名確認 email 發送畀參加者"
+      {/* Sessions */}
+      <Section
+        title="活動場次"
+        action={
+          <button
+            type="button"
+            onClick={addSession}
+            className="inline-flex items-center gap-1.5 text-[12px] text-brand-accent hover:text-brand-dark font-semibold"
           >
-            <input
-              type="url"
-              value={form.zoomLink}
-              onChange={(e) => updateField("zoomLink", e.target.value)}
-              className="input"
-              placeholder="https://zoom.us/j/..."
-            />
-          </Field>
-        )}
+            <Plus className="w-3.5 h-3.5" />
+            新增場次
+          </button>
+        }
+      >
+        <p className="text-[12px] text-brand-softer mb-2">
+          一個活動可以有多場（例如分兩日舉行），每場有獨立日期、地點、名額。報名者可選擇參加邊一場。
+        </p>
+        <div className="space-y-4">
+          {sessions.map((s, idx) => (
+            <div
+              key={s._key}
+              className="border border-brand-hair p-5 bg-brand-bg/40 relative"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2 text-[12px] font-semibold text-brand-dark">
+                  <GripVertical className="w-3.5 h-3.5 text-brand-softer" />
+                  第 {idx + 1} 場
+                </div>
+                {sessions.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeSession(s._key)}
+                    className="text-brand-softer hover:text-red-600"
+                    aria-label="移除呢場"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="開始時間" required>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={s.startDate}
+                    onChange={(e) =>
+                      updateSession(s._key, { startDate: e.target.value })
+                    }
+                    className="input"
+                  />
+                </Field>
+                <Field label="結束時間" hint="選填">
+                  <input
+                    type="datetime-local"
+                    value={s.endDate}
+                    onChange={(e) =>
+                      updateSession(s._key, { endDate: e.target.value })
+                    }
+                    className="input"
+                  />
+                </Field>
+              </div>
+
+              {form.eventType !== "online" && (
+                <Field label="地點" required={form.eventType === "offline"}>
+                  <input
+                    type="text"
+                    value={s.location}
+                    onChange={(e) =>
+                      updateSession(s._key, { location: e.target.value })
+                    }
+                    className="input"
+                    placeholder="例：Link Hub｜荔枝角永康街..."
+                  />
+                </Field>
+              )}
+              {form.eventType !== "offline" && (
+                <Field label="Zoom 連結" hint="會喺報名確認 email 發送畀參加者">
+                  <input
+                    type="url"
+                    value={s.zoomLink}
+                    onChange={(e) =>
+                      updateSession(s._key, { zoomLink: e.target.value })
+                    }
+                    className="input"
+                    placeholder="https://zoom.us/j/..."
+                  />
+                </Field>
+              )}
+
+              <Field label="名額上限" hint="留空 = 不限">
+                <input
+                  type="number"
+                  min="0"
+                  value={s.capacity}
+                  onChange={(e) =>
+                    updateSession(s._key, { capacity: e.target.value })
+                  }
+                  className="input"
+                  placeholder="不限"
+                />
+              </Field>
+            </div>
+          ))}
+        </div>
       </Section>
 
-      {/* Speaker */}
-      <Section title="講師資料">
-        <Field label="講師姓名">
+      {/* Speakers */}
+      <Section
+        title="講師資料"
+        action={
+          <button
+            type="button"
+            onClick={addSpeaker}
+            className="inline-flex items-center gap-1.5 text-[12px] text-brand-accent hover:text-brand-dark font-semibold"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            新增講師
+          </button>
+        }
+      >
+        <p className="text-[12px] text-brand-softer mb-2">
+          可以新增多位講師。圖片請上傳 1:1 正方形比例，活動頁面會自動裁剪成圓形顯示。
+        </p>
+        <div className="space-y-4">
+          {speakers.map((sp, idx) => (
+            <div
+              key={sp._key}
+              className="border border-brand-hair p-5 bg-brand-bg/40 relative"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-[12px] font-semibold text-brand-dark">
+                  講師 {idx + 1}
+                </div>
+                {speakers.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeSpeaker(sp._key)}
+                    className="text-brand-softer hover:text-red-600"
+                    aria-label="移除呢位講師"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-5">
+                {/* Photo */}
+                <div className="flex-shrink-0">
+                  {sp.photoUrl ? (
+                    <div className="relative w-28 h-28 rounded-full overflow-hidden border border-brand-hair">
+                      <Image
+                        src={sp.photoUrl}
+                        alt={sp.name || "Speaker"}
+                        fill
+                        sizes="112px"
+                        className="object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateSpeaker(sp._key, { photoUrl: undefined })
+                        }
+                        className="absolute -top-1 -right-1 bg-white border border-brand-hair rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-50 hover:border-red-300"
+                        aria-label="移除圖片"
+                      >
+                        <X className="w-3 h-3 text-red-600" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="w-28 h-28 rounded-full border-2 border-dashed border-brand-rule flex flex-col items-center justify-center cursor-pointer hover:border-brand-accent transition text-center">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleSpeakerPhoto(sp._key, f);
+                        }}
+                      />
+                      {uploadingSpeakerKey === sp._key ? (
+                        <Loader2 className="w-5 h-5 text-brand-accent animate-spin" />
+                      ) : (
+                        <>
+                          <Upload className="w-5 h-5 text-brand-accent mb-1" />
+                          <span className="text-[10px] text-brand-softer leading-tight">
+                            上載
+                            <br />
+                            1:1 圖片
+                          </span>
+                        </>
+                      )}
+                    </label>
+                  )}
+                </div>
+
+                {/* Fields */}
+                <div className="flex-1 space-y-3">
+                  <Field label="講師姓名" required>
+                    <input
+                      type="text"
+                      value={sp.name}
+                      onChange={(e) =>
+                        updateSpeaker(sp._key, { name: e.target.value })
+                      }
+                      className="input"
+                      placeholder="例：陳大文"
+                    />
+                  </Field>
+                  <Field label="講師簡介">
+                    <textarea
+                      value={sp.bio ?? ""}
+                      onChange={(e) =>
+                        updateSpeaker(sp._key, { bio: e.target.value })
+                      }
+                      className="input min-h-[80px]"
+                      placeholder="講師背景、經驗、成就..."
+                    />
+                  </Field>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      {/* Speaker notification emails */}
+      <Section title="講師通知電郵">
+        <p className="text-[12px] text-brand-softer mb-2">
+          每次有人報名活動，呢度填嘅電郵會收到通知（連同 info@createhub.biz）。可以加多過一個。
+        </p>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {speakerEmails.map((email) => (
+            <span
+              key={email}
+              className="inline-flex items-center gap-1.5 bg-brand-dark text-white text-[12px] px-3 py-1.5"
+            >
+              {email}
+              <button
+                type="button"
+                onClick={() => removeSpeakerEmail(email)}
+                className="hover:text-red-300"
+                aria-label={`移除 ${email}`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+          {speakerEmails.length === 0 && (
+            <span className="text-[11px] text-brand-softer italic">
+              暫未設定（只會通知 info@createhub.biz）
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2">
           <input
-            type="text"
-            value={form.speakerName}
-            onChange={(e) => updateField("speakerName", e.target.value)}
-            className="input"
+            type="email"
+            value={speakerEmailInput}
+            onChange={(e) => setSpeakerEmailInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                commitSpeakerEmail();
+              }
+            }}
+            className="input flex-1"
+            placeholder="speaker@example.com（按 Enter 加入）"
           />
-        </Field>
-        <Field label="講師簡介">
-          <textarea
-            value={form.speakerBio}
-            onChange={(e) => updateField("speakerBio", e.target.value)}
-            className="input min-h-[100px]"
-            placeholder="講師背景、經驗、成就..."
-          />
-        </Field>
+          <button
+            type="button"
+            onClick={commitSpeakerEmail}
+            className="px-4 bg-brand-bg border border-brand-rule text-[12px] font-semibold text-brand-dark hover:border-brand-accent"
+          >
+            加入
+          </button>
+        </div>
       </Section>
 
       {/* Pricing */}
-      <Section title="費用與名額">
+      <Section title="費用">
         <div className="space-y-4">
           <label className="flex items-center gap-2.5 cursor-pointer">
             <input
@@ -338,33 +746,19 @@ export default function EventForm({ mode, initial }: Props) {
             <span className="text-[14px] text-brand-text">免費活動</span>
           </label>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {!form.isFree && (
-              <Field label="價格 (HK$)" required={!form.isFree}>
-                <input
-                  type="number"
-                  min="0"
-                  value={form.priceHkd}
-                  onChange={(e) =>
-                    updateField("priceHkd", Number(e.target.value))
-                  }
-                  className="input"
-                />
-              </Field>
-            )}
-            <Field label="名額上限" hint="留空 = 不限">
+          {!form.isFree && (
+            <Field label="價格 (HK$)" required={!form.isFree}>
               <input
                 type="number"
                 min="0"
-                value={form.capacity || ""}
+                value={form.priceHkd}
                 onChange={(e) =>
-                  updateField("capacity", Number(e.target.value))
+                  updateField("priceHkd", Number(e.target.value))
                 }
-                className="input"
-                placeholder="不限"
+                className="input max-w-[200px]"
               />
             </Field>
-          </div>
+          )}
         </div>
       </Section>
 
@@ -445,14 +839,19 @@ export default function EventForm({ mode, initial }: Props) {
 
 function Section({
   title,
+  action,
   children,
 }: {
   title: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="pb-8 border-b border-brand-hair">
-      <div className="eyebrow-muted mb-5">{title}</div>
+      <div className="flex items-center justify-between mb-5">
+        <div className="eyebrow-muted">{title}</div>
+        {action}
+      </div>
       <div className="space-y-5">{children}</div>
     </div>
   );

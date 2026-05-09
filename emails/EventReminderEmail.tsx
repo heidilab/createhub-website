@@ -16,33 +16,30 @@ interface Props {
   location?: string;
   isOnline?: boolean;
   zoomLink?: string;
-  speakerNames?: string; // comma-separated for multi-speaker events
+  speakerNames?: string;
   eventUrl?: string;
-  addToCalendarUrl?: string;
 }
 
-export default function EventConfirmationEmail({
+export default function EventReminderEmail({
   fullName = "會員",
   eventTitle = "活動名稱",
-  eventDateText = "日期時間",
+  eventDateText = "明日",
   location = "",
   isOnline = false,
   zoomLink = "",
   speakerNames = "",
   eventUrl = "https://www.createhub.biz/events",
-  addToCalendarUrl = "",
 }: Props) {
   return (
-    <EmailShell previewText={`【報名確認】${eventTitle}`}>
-      <Text style={eyebrowStyle}>Registration Confirmed</Text>
+    <EmailShell previewText={`【活動提醒】聽日見：${eventTitle}`}>
+      <Text style={eyebrowStyle}>Event Reminder</Text>
       <div style={ruleStyle} />
-      <Text style={h1Style}>報名成功！</Text>
+      <Text style={h1Style}>聽日活動提醒</Text>
 
       <Text style={bodyStyle}>
-        {fullName}，感謝你報名參加以下活動。我哋期待與你喺活動見面。
+        {fullName}，溫馨提醒：你報名嘅活動 <strong>聽日</strong> 就會舉行。
       </Text>
 
-      {/* Event info box */}
       <div
         style={{
           backgroundColor: COLORS.bg,
@@ -86,10 +83,8 @@ export default function EventConfirmationEmail({
                 margin: "14px 0",
               }}
             />
-            <Text
-              style={{ ...bodyStyle, margin: "0 0 6px", fontSize: "12px" }}
-            >
-              Zoom 連結：
+            <Text style={{ ...bodyStyle, margin: "0 0 6px", fontSize: "12px" }}>
+              Zoom 連結（請提早幾分鐘進入）：
             </Text>
             <Link
               href={zoomLink}
@@ -106,44 +101,19 @@ export default function EventConfirmationEmail({
         )}
       </div>
 
+      <Text style={bodyStyle}>
+        如果你 <strong>無法出席</strong>，請盡快電郵 info@createhub.biz
+        通知我哋，等其他想參加嘅人有機會候補。
+      </Text>
+
       <div style={{ textAlign: "center" as const, margin: "28px 0 16px" }}>
         <Link href={eventUrl} style={ctaButtonStyle}>
           查看活動詳情
         </Link>
       </div>
 
-      {addToCalendarUrl && (
-        <Text
-          style={{
-            ...bodyStyle,
-            fontSize: "13px",
-            textAlign: "center",
-          }}
-        >
-          <Link
-            href={addToCalendarUrl}
-            style={{ color: COLORS.accent, textDecoration: "none" }}
-          >
-            加入 Google Calendar →
-          </Link>
-        </Text>
-      )}
-
-      <div
-        style={{
-          borderTop: `1px solid ${COLORS.hair}`,
-          margin: "30px 0 18px",
-        }}
-      />
-
       <Text style={{ ...bodyStyle, fontSize: "12px", color: COLORS.softer }}>
-        如需取消報名或有其他查詢，請電郵至{" "}
-        <Link
-          href="mailto:info@createhub.biz"
-          style={{ color: COLORS.accent, textDecoration: "none" }}
-        >
-          info@createhub.biz
-        </Link>
+        我哋期待聽日喺活動見到你！
       </Text>
     </EmailShell>
   );

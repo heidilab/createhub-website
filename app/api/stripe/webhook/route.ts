@@ -2,9 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { adminDb } from "@/lib/firebase/admin";
-import { resend, FROM, SITE_URL } from "@/lib/resend";
-import EventConfirmationEmail from "@/emails/EventConfirmationEmail";
-import { formatEventDate } from "@/lib/date";
+import { sendRegistrationEmails } from "@/lib/event-notifications";
 
 export const runtime = "nodejs";
 
@@ -91,32 +89,24 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     paidAt: new Date(),
   });
 
-  // Fetch event to render confirmation email
-  const eventSnap = await db.collection("events").doc(reg.eventId).get();
-  const event = eventSnap.data();
-  if (!event) return;
-
-  if (resend && reg.userEmail) {
-    try {
-      await resend.emails.send({
-        from: FROM,
-        to: reg.userEmail,
-        subject: `【報名確認 — 已付款】${event.title}`,
-        react: EventConfirmationEmail({
-          fullName: reg.userName || reg.userEmail,
-          eventTitle: event.title,
-          eventDateText: formatEventDate(event.eventDate),
-          location: event.location,
-          isOnline: event.eventType === "online",
-          zoomLink: event.zoomLink,
-          speakerName: event.speakerName,
-          eventUrl: `${SITE_URL}/events/${reg.eventId}`,
-        }),
-      });
-    } catch (err) {
-      console.warn("[webhook] email send failed:", err);
-    }
+  // Look up whatsapp from user profile for the notification email
+  let whatsapp: string | undefined;
+  try {
+    const userSnap = await db.collection("users").doc(reg.userId).get();
+    whatsapp = userSnap.data()?.whatsapp;
+  } catch {
+    // ignore
   }
+
+  await sendRegistrationEmails({
+    eventId: reg.eventId,
+    sessionId: reg.sessionId ?? "default",
+    attendee: {
+      email: reg.userEmail,
+      name: reg.userName,
+      whatsapp,
+    },
+  });
 }
 
 async function handleCheckoutFailed(session: Stripe.Checkout.Session) {
