@@ -13,7 +13,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import { slugify } from "@/lib/utils";
-import type { Event, Speaker, EventSession } from "@/types";
+import type { Event, Speaker } from "@/types";
 import { toDate } from "@/lib/date";
 
 function toLocalInput(d: Date | null): string {
