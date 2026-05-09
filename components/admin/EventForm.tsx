@@ -369,15 +369,18 @@ export default function EventForm({ mode, initial }: Props) {
         </Field>
       </Section>
 
-      {/* Cover */}
-      <Section title="封面圖">
+      {/* Cover / Promo image */}
+      <Section title="活動宣傳圖（4:5）">
+        <p className="text-[12px] text-brand-softer mb-3">
+          會顯示於主頁活動列表同活動詳情頁面。請上傳 1080×1350px（4:5 直度）。
+        </p>
         {form.coverImage ? (
-          <div className="relative w-full aspect-[16/9] bg-brand-bg border border-brand-hair mb-3">
+          <div className="relative w-full max-w-[280px] aspect-[4/5] bg-brand-bg border border-brand-hair mb-3">
             <Image
               src={form.coverImage}
               alt="Cover"
               fill
-              sizes="(max-width: 768px) 100vw, 600px"
+              sizes="280px"
               className="object-cover"
             />
             <button
@@ -409,10 +412,10 @@ export default function EventForm({ mode, initial }: Props) {
               <>
                 <Upload className="w-6 h-6 mx-auto mb-2 text-brand-accent" />
                 <div className="text-[13px] text-brand-muted mb-1">
-                  撳呢度上傳封面圖
+                  撳呢度上傳活動宣傳圖
                 </div>
                 <div className="text-[10px] text-brand-softer">
-                  JPG / PNG · 最大 5MB · 建議 1600×900
+                  JPG / PNG · 最大 5MB · 1080×1350px (4:5 直度)
                 </div>
               </>
             )}

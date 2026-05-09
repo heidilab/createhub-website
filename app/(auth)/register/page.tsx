@@ -28,6 +28,11 @@ function RegisterForm() {
       setLoading(false);
       return;
     }
+    if (!whatsapp.trim() || whatsapp.replace(/\D/g, "").length < 8) {
+      setError("請填寫有效嘅 WhatsApp 聯絡電話");
+      setLoading(false);
+      return;
+    }
     try {
       await registerWithEmail(email, password, fullName, whatsapp, newsletter);
       router.push(redirect);
@@ -128,10 +133,11 @@ function RegisterForm() {
           />
         </Field>
 
-        <Field label="WhatsApp（選填）" htmlFor="whatsapp">
+        <Field label="WhatsApp 聯絡電話" htmlFor="whatsapp">
           <input
             id="whatsapp"
             type="tel"
+            required
             value={whatsapp}
             onChange={(e) => setWhatsapp(e.target.value)}
             className="input"

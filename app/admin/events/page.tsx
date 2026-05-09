@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Edit2 } from "lucide-react";
+import { Plus, Edit2, Users } from "lucide-react";
 import { adminDb } from "@/lib/firebase/admin";
 import { formatEventDate } from "@/lib/date";
 import { categoryLabel, eventTypeLabel } from "@/lib/utils";
@@ -113,14 +113,24 @@ export default async function AdminEventsPage() {
                       status={e.status}
                     />
                   </td>
-                  <td className="p-3">
-                    <Link
-                      href={`/admin/events/${e.id}/edit`}
-                      className="inline-flex items-center gap-1 text-brand-accent hover:text-brand-dark"
-                    >
-                      <Edit2 className="w-3 h-3" />
-                      編輯
-                    </Link>
+                  <td className="p-3 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      <Link
+                        href={`/admin/events/${e.id}/registrations`}
+                        className="inline-flex items-center gap-1 text-brand-dark hover:text-brand-accent font-semibold"
+                      >
+                        <Users className="w-3 h-3" />
+                        查看報名名單
+                      </Link>
+                      <span className="text-brand-hair">|</span>
+                      <Link
+                        href={`/admin/events/${e.id}/edit`}
+                        className="inline-flex items-center gap-1 text-brand-accent hover:text-brand-dark"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                        編輯
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}

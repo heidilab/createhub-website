@@ -82,57 +82,39 @@ export default async function EventDetailPage({
   return (
     <>
       <JsonLd data={schema} />
-      {/* Cover */}
-      {event.coverImage ? (
-        <div className="relative w-full aspect-[21/9] bg-brand-dark">
-          <Image
-            src={event.coverImage}
-            alt={event.title}
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover opacity-90"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-        </div>
-      ) : (
-        <div className="w-full aspect-[21/9] bg-gradient-to-br from-brand-dark to-brand-text flex items-center justify-center">
-          <span className="font-serif text-6xl lg:text-8xl text-white/10">
-            創 研 社
-          </span>
-        </div>
-      )}
+      {/* Title hero (no banner image) */}
+      <section className="gradient-hero pt-14 pb-10 lg:pt-20 lg:pb-14">
+        <div className="container-wide px-5 lg:px-8">
+          <Link
+            href="/events"
+            className="inline-flex items-center gap-1.5 text-[12px] text-brand-muted hover:text-brand-dark mb-8"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            返回活動列表
+          </Link>
 
-      {/* Back link */}
-      <div className="container-wide px-5 lg:px-8 pt-6">
-        <Link
-          href="/events"
-          className="inline-flex items-center gap-1.5 text-[12px] text-brand-muted hover:text-brand-dark"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          返回活動列表
-        </Link>
-      </div>
+          <div className="flex flex-wrap gap-2 mb-6">
+            <span className="pill-tag-accent">
+              {categoryLabel(event.category)}
+            </span>
+            <span className="pill-tag">{eventTypeLabel(event.eventType)}</span>
+            {!event.isFree && (
+              <span className="pill-tag-dark">
+                HK${event.priceHkd.toLocaleString()}
+              </span>
+            )}
+          </div>
+
+          <h1 className="font-serif text-[36px] sm:text-[44px] lg:text-[60px] leading-[1.05] text-brand-text max-w-4xl">
+            {event.title}
+          </h1>
+        </div>
+      </section>
 
       <div className="gradient-soft py-10">
         <div className="container-wide px-5 lg:px-8 grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-14">
           {/* Left — content */}
           <div className="lg:col-span-2">
-            <div className="flex flex-wrap gap-2 mb-5">
-              <span className="pill-tag-accent">
-                {categoryLabel(event.category)}
-              </span>
-              <span className="pill-tag">{eventTypeLabel(event.eventType)}</span>
-              {!event.isFree && (
-                <span className="pill-tag-dark">
-                  HK${event.priceHkd.toLocaleString()}
-                </span>
-              )}
-            </div>
-
-            <h1 className="font-serif text-[36px] sm:text-[42px] lg:text-[54px] leading-[1.1] text-brand-text mb-8">
-              {event.title}
-            </h1>
 
             {/* Sessions list */}
             <div className="glass-card rounded-3xl p-7 mb-8">
@@ -262,9 +244,22 @@ export default async function EventDetailPage({
             )}
           </div>
 
-          {/* Right — registration */}
+          {/* Right — promo image + registration */}
           <aside className="lg:col-span-1">
-            <div className="sticky top-28">
+            <div className="sticky top-28 space-y-6">
+              {/* Promo image (4:5 portrait) */}
+              {event.coverImage && (
+                <div className="relative w-full aspect-[4/5] bg-brand-bg overflow-hidden rounded-2xl border border-brand-hair shadow-sm">
+                  <Image
+                    src={event.coverImage}
+                    alt={event.title}
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 380px"
+                    className="object-cover"
+                  />
+                </div>
+              )}
+
               <RegistrationForm
                 eventId={event.id}
                 eventTitle={event.title}

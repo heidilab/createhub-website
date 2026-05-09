@@ -47,14 +47,16 @@ export default function RegistrationForm({
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
+  // WhatsApp gate: if profile has no WhatsApp, prompt before registration
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
+  const [whatsappInput, setWhatsappInput] = useState("");
+  const [savingWhatsapp, setSavingWhatsapp] = useState(false);
+  const [whatsappError, setWhatsappError] = useState("");
+
   const allRegistered =
     sessions.length > 0 && sessions.every((s) => s.isRegistered);
 
-  const handleRegister = async () => {
-    if (!selectedSessionId) {
-      setError("請揀選一個場次");
-      return;
-    }
+  const submitRegistration = async () => {
     setSubmitting(true);
     setError("");
     try {
@@ -79,6 +81,51 @@ export default function RegistrationForm({
       setError(err instanceof Error ? err.message : "報名失敗，請稍後再試");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRegister = () => {
+    if (!selectedSessionId) {
+      setError("請揀選一個場次");
+      return;
+    }
+    setError("");
+
+    // WhatsApp gate
+    const hasWhatsapp = !!profile?.whatsapp && profile.whatsapp.trim().length > 0;
+    if (!hasWhatsapp) {
+      setWhatsappInput("");
+      setWhatsappError("");
+      setWhatsappModalOpen(true);
+      return;
+    }
+
+    void submitRegistration();
+  };
+
+  const handleSaveWhatsapp = async () => {
+    setWhatsappError("");
+    const digits = whatsappInput.replace(/\D/g, "");
+    if (digits.length < 8) {
+      setWhatsappError("請填寫有效嘅 WhatsApp 號碼（至少 8 位數字）");
+      return;
+    }
+    setSavingWhatsapp(true);
+    try {
+      const res = await fetch("/api/profile/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ whatsapp: whatsappInput.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "更新失敗");
+      setWhatsappModalOpen(false);
+      // Profile snapshot will update via onSnapshot; proceed with registration immediately.
+      await submitRegistration();
+    } catch (err) {
+      setWhatsappError(err instanceof Error ? err.message : "更新失敗");
+    } finally {
+      setSavingWhatsapp(false);
     }
   };
 
@@ -302,6 +349,76 @@ export default function RegistrationForm({
           ? "撳「立即報名」表示同意創研社嘅活動條款。"
           : "撳「前往付款」會跳轉至 Stripe 安全付款頁面。支援信用卡 / Apple Pay / Google Pay / AlipayHK / WeChat Pay。"}
       </p>
+
+      {/* WhatsApp gate modal */}
+      {whatsappModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !savingWhatsapp) {
+              setWhatsappModalOpen(false);
+            }
+          }}
+        >
+          <div className="bg-white max-w-md w-full p-7 shadow-2xl">
+            <div className="eyebrow-muted mb-3">最後一步</div>
+            <div className="rule-accent mb-5" />
+            <h3 className="font-serif text-[22px] text-brand-text mb-2">
+              請填寫 WhatsApp 聯絡電話
+            </h3>
+            <p className="text-[13px] text-brand-muted leading-relaxed mb-5">
+              我哋需要你嘅 WhatsApp 聯絡電話，以便活動有任何更新時通知你。填寫後會自動完成報名。
+            </p>
+
+            <div className="mb-4">
+              <label
+                htmlFor="whatsapp-gate"
+                className="block text-[11px] text-brand-muted tracking-[0.15em] uppercase font-semibold mb-1.5"
+              >
+                WhatsApp 號碼 <span className="text-brand-accent">*</span>
+              </label>
+              <input
+                id="whatsapp-gate"
+                type="tel"
+                value={whatsappInput}
+                onChange={(e) => setWhatsappInput(e.target.value)}
+                className="input"
+                placeholder="+852 9xxx xxxx"
+                autoComplete="tel"
+                autoFocus
+                disabled={savingWhatsapp}
+              />
+            </div>
+
+            {whatsappError && (
+              <div className="text-[12px] text-red-700 bg-red-50 border border-red-200 px-3 py-2 mb-4">
+                {whatsappError}
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setWhatsappModalOpen(false)}
+                disabled={savingWhatsapp}
+                className="flex-1 text-[13px] text-brand-muted hover:text-brand-dark py-3 disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveWhatsapp}
+                disabled={savingWhatsapp}
+                className="flex-1 bg-brand-dark text-white py-3 text-[13px] font-bold tracking-wide hover:bg-brand-text transition disabled:opacity-50"
+              >
+                {savingWhatsapp ? "處理中…" : "儲存並報名"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
