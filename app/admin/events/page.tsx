@@ -84,11 +84,15 @@ export default async function AdminEventsPage() {
                     <div className="font-semibold text-brand-text max-w-xs truncate">
                       {e.title}
                     </div>
-                    {e.speakerName && (
+                    {e.speakers && e.speakers.length > 0 ? (
+                      <div className="text-[11px] text-brand-softer mt-0.5">
+                        {e.speakers.map((s) => s.name).join(" × ")}
+                      </div>
+                    ) : e.speakerName ? (
                       <div className="text-[11px] text-brand-softer mt-0.5">
                         {e.speakerName}
                       </div>
-                    )}
+                    ) : null}
                   </td>
                   <td className="p-3">
                     <div className="flex flex-wrap gap-1">

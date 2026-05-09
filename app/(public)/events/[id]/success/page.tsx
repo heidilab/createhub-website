@@ -46,12 +46,14 @@ export default async function EventSuccessPage({
                 {formatEventDate(event.eventDate)}
               </span>
             </div>
-            {event.speakerName && (
+            {event.speakers && event.speakers.length > 0 && (
               <div className="flex gap-3">
                 <span className="text-[11px] text-brand-softer tracking-[0.15em] uppercase w-16 pt-0.5">
                   講師
                 </span>
-                <span className="text-brand-text">{event.speakerName}</span>
+                <span className="text-brand-text">
+                  {event.speakers.map((s) => s.name).join(" × ")}
+                </span>
               </div>
             )}
             {event.eventType === "online" ? (

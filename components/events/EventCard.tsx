@@ -78,10 +78,14 @@ export default function EventCard({ event }: { event: Event }) {
             <CalendarDays className="w-3 h-3 flex-shrink-0" />
             <span>{d ? `${month} ${day} · ${time}` : ""}</span>
           </div>
-          {event.speakerName && (
+          {event.speakers && event.speakers.length > 0 && (
             <div className="flex items-center gap-1.5">
-              <span className="text-brand-muted">講師</span>
-              <span className="truncate">{event.speakerName}</span>
+              <span className="text-brand-muted">
+                {event.speakers.length > 1 ? "講師" : "講師"}
+              </span>
+              <span className="truncate">
+                {event.speakers.map((s) => s.name).join(" × ")}
+              </span>
             </div>
           )}
           {(event.location || event.eventType === "online") && (

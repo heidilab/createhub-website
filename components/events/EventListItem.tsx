@@ -89,7 +89,9 @@ export default function EventListItem({ event }: { event: Event }) {
         </h3>
         <div className="text-[12px] text-brand-softer">
           {weekday} {time}
-          {event.speakerName && <> — {event.speakerName}</>}
+          {event.speakers && event.speakers.length > 0 && (
+            <> — {event.speakers.map((s) => s.name).join(" × ")}</>
+          )}
         </div>
       </div>
     </Link>
