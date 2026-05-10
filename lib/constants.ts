@@ -7,7 +7,7 @@ export const SITE = {
   email: "info@createhub.biz",
   phone: "+852 9691 6190",
   whatsapp: "+85296916190",
-  address: "Wan Chai, Hong Kong",
+  address: "Lai Chi Kok, Hong Kong",
   learnworldsUrl:
     process.env.NEXT_PUBLIC_LEARNWORLDS_URL ||
     "https://createhub.learnworlds.com/home",

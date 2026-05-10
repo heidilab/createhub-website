@@ -109,7 +109,7 @@ export function EmailShell({
                 margin: 0,
               }}
             >
-              創研社 CREATE HUB · Wan Chai, Hong Kong
+              創研社 CREATE HUB · Lai Chi Kok, Hong Kong
               <br />
               <Link
                 href="mailto:info@createhub.biz"

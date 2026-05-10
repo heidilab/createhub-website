@@ -16,7 +16,7 @@ export function organizationJsonLd() {
     telephone: SITE.phone,
     address: {
       "@type": "PostalAddress",
-      addressLocality: "Wan Chai",
+      addressLocality: "Lai Chi Kok",
       addressRegion: "Hong Kong",
       addressCountry: "HK",
     },
