@@ -12,9 +12,9 @@ export const SITE = {
     process.env.NEXT_PUBLIC_LEARNWORLDS_URL ||
     "https://createhub.learnworlds.com/home",
   social: {
-    facebook: "https://www.facebook.com/createhub",
+    facebook: "https://www.facebook.com/profile.php?id=61576945907548",
     instagram: "https://www.instagram.com/createhub.hk",
-    youtube: "https://www.youtube.com/@createhub",
+    youtube: "https://www.youtube.com/@CreateHub-hk",
     whatsapp: "https://wa.me/85296916190",
   },
   venue: {
