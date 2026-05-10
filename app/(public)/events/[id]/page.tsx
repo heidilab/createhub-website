@@ -14,7 +14,7 @@ import {
   getUserRegisteredSessionIds,
 } from "@/lib/registrations";
 import { getSessionUser } from "@/lib/firebase/session";
-import { toDate, formatEventDate } from "@/lib/date";
+import { toDate, formatEventDate, formatTime24 } from "@/lib/date";
 import { categoryLabel, eventTypeLabel } from "@/lib/utils";
 import RegistrationForm from "@/components/events/RegistrationForm";
 import JsonLd from "@/components/seo/JsonLd";
@@ -143,15 +143,7 @@ export default async function EventDetailPage({
                       )}
                       <div className="text-[14px] text-brand-text font-semibold mb-0.5">
                         {formatEventDate(s.startDate)}
-                        {s.endDate && (
-                          <>
-                            {" "}
-                            —{" "}
-                            {`${toDate(s.endDate)?.getHours() ?? 0}:${String(
-                              toDate(s.endDate)?.getMinutes() ?? 0
-                            ).padStart(2, "0")}`}
-                          </>
-                        )}
+                        {s.endDate && <> — {formatTime24(s.endDate)}</>}
                       </div>
                       {event.eventType !== "online" && s.location && (
                         <div className="text-[12px] text-brand-softer flex items-center gap-1.5">

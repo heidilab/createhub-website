@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { getSessionUser } from "@/lib/firebase/session";
 import { adminDb } from "@/lib/firebase/admin";
-import { formatEventDate } from "@/lib/date";
+import { formatEventDate, hktParts } from "@/lib/date";
 
 export const runtime = "nodejs";
 
@@ -86,7 +86,7 @@ export async function GET(
       const sid = r.sessionId ?? "default";
       const session = sessionMap[sid];
       const profile = r.userId ? userMap.get(r.userId) : undefined;
-      const registeredAt =
+      const registeredAtRaw =
         r.registeredAt instanceof Date
           ? r.registeredAt
           : (r.registeredAt as { toDate?: () => Date })?.toDate?.() ??
@@ -96,6 +96,7 @@ export async function GET(
                   ((r.registeredAt as { seconds: number }).seconds ?? 0) * 1000
                 )
               : null);
+      const registeredHKT = hktParts(registeredAtRaw);
       return {
         sessionId: sid,
         sessionDate: session?.startDate
@@ -109,8 +110,8 @@ export async function GET(
           r.status === "cancelled"
             ? "已取消"
             : STATUS_LABEL[r.paymentStatus ?? ""] ?? r.paymentStatus ?? "—",
-        registeredAt: registeredAt
-          ? `${registeredAt.getFullYear()}-${String(registeredAt.getMonth() + 1).padStart(2, "0")}-${String(registeredAt.getDate()).padStart(2, "0")} ${String(registeredAt.getHours()).padStart(2, "0")}:${String(registeredAt.getMinutes()).padStart(2, "0")}`
+        registeredAt: registeredHKT
+          ? `${registeredHKT.year}-${String(registeredHKT.month).padStart(2, "0")}-${String(registeredHKT.day).padStart(2, "0")} ${String(registeredHKT.hour).padStart(2, "0")}:${String(registeredHKT.minute).padStart(2, "0")}`
           : "—",
       };
     })

@@ -7,7 +7,7 @@ import InstagramFeed from "@/components/home/InstagramFeed";
 import RotatingFounderCard from "@/components/home/RotatingFounderCard";
 import { getUpcomingEvents } from "@/lib/events";
 import { getVisibleTeamMembers } from "@/lib/team";
-import { toDate } from "@/lib/date";
+import { hktParts } from "@/lib/date";
 import { SITE } from "@/lib/constants";
 import JsonLd from "@/components/seo/JsonLd";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/jsonld";
@@ -200,9 +200,9 @@ export default async function HomePage() {
                     <div className="mt-2 flex items-center gap-1.5">
                       <span className="text-[10px] text-brand-softer">
                         {(() => {
-                          const d = toDate(nextEvent.eventDate);
-                          if (!d) return "";
-                          return `${d.getMonth() + 1}月${d.getDate()}日`;
+                          const p = hktParts(nextEvent.eventDate);
+                          if (!p) return "";
+                          return `${p.month}月${p.day}日`;
                         })()}
                       </span>
                       <ArrowRight className="w-3 h-3 text-brand-accent" />

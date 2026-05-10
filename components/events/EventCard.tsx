@@ -2,33 +2,53 @@ import Link from "next/link";
 import Image from "next/image";
 import { CalendarDays, MapPin, Video } from "lucide-react";
 import type { Event } from "@/types";
-import { toDate } from "@/lib/date";
+import { hktParts } from "@/lib/date";
 import { categoryLabel, priceLabel } from "@/lib/utils";
 
 const MONTH_ABBR = [
-  "JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC",
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
 ];
 
-function formatTime(d: Date) {
-  const h = d.getHours();
-  const m = d.getMinutes();
-  const am = h < 12;
-  const hh = h % 12 === 0 ? 12 : h % 12;
-  return `${hh}:${String(m).padStart(2, "0")}${am ? "am" : "pm"}`;
-}
+const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export default function EventCard({ event }: { event: Event }) {
-  const d = toDate(event.eventDate);
-  const month = d ? MONTH_ABBR[d.getMonth()] : "";
-  const day = d ? d.getDate() : "";
-  const time = d ? formatTime(d) : "";
+  const sessions =
+    event.sessions && event.sessions.length > 0
+      ? event.sessions
+      : [
+          {
+            id: "default",
+            startDate: event.eventDate,
+            location: event.location ?? null,
+          },
+        ];
+
+  const firstParts = hktParts(sessions[0]?.startDate);
+  const month = firstParts ? MONTH_ABBR[firstParts.month - 1] : "";
+  const day = firstParts ? firstParts.day : "";
+
+  const speakerNames =
+    event.speakers && event.speakers.length > 0
+      ? event.speakers.map((s) => s.name).join(" × ")
+      : event.speakerName;
 
   return (
     <Link
       href={`/events/${event.id}`}
       className="group flex flex-col bg-white border border-brand-hair hover:border-brand-accent transition"
     >
-      <div className="aspect-[16/10] relative bg-gradient-to-br from-brand-light/40 to-brand-accent/20 overflow-hidden">
+      <div className="aspect-[4/5] relative bg-gradient-to-br from-brand-light/40 to-brand-accent/20 overflow-hidden">
         {event.coverImage ? (
           <Image
             src={event.coverImage}
@@ -39,11 +59,15 @@ export default function EventCard({ event }: { event: Event }) {
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="font-serif text-5xl text-brand-dark/20">創 研 社</span>
+            <span className="font-serif text-5xl text-brand-dark/20">
+              創 研 社
+            </span>
           </div>
         )}
         <div className="absolute top-3 left-3 flex gap-1.5">
-          <span className="tag-type bg-white/95">{categoryLabel(event.category)}</span>
+          <span className="tag-type bg-white/95">
+            {categoryLabel(event.category)}
+          </span>
           <span className="tag-loc bg-white/95 border-white">
             {event.eventType === "online" ? (
               <span className="inline-flex items-center gap-1">
@@ -56,7 +80,7 @@ export default function EventCard({ event }: { event: Event }) {
             )}
           </span>
         </div>
-        {d && (
+        {sessions.length === 1 && firstParts ? (
           <div className="absolute bottom-3 left-3 bg-white border border-brand-accent px-2.5 py-1.5 text-center">
             <div className="text-[9px] text-brand-accent tracking-[0.15em] uppercase font-bold leading-none">
               {month}
@@ -65,7 +89,13 @@ export default function EventCard({ event }: { event: Event }) {
               {day}
             </div>
           </div>
-        )}
+        ) : sessions.length > 1 ? (
+          <div className="absolute bottom-3 left-3 bg-brand-dark/95 px-2.5 py-1.5 text-center">
+            <div className="text-[9px] text-brand-accent tracking-[0.2em] uppercase font-bold">
+              共 {sessions.length} 場
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex-1 p-5 flex flex-col">
@@ -74,18 +104,28 @@ export default function EventCard({ event }: { event: Event }) {
         </h3>
 
         <div className="space-y-1.5 text-[12px] text-brand-softer">
-          <div className="flex items-center gap-1.5">
-            <CalendarDays className="w-3 h-3 flex-shrink-0" />
-            <span>{d ? `${month} ${day} · ${time}` : ""}</span>
-          </div>
-          {event.speakers && event.speakers.length > 0 && (
+          {sessions.map((s, idx) => {
+            const p = hktParts(s.startDate);
+            if (!p) return null;
+            return (
+              <div key={s.id ?? idx} className="flex items-center gap-1.5">
+                <CalendarDays className="w-3 h-3 flex-shrink-0" />
+                <span>
+                  {sessions.length > 1 && (
+                    <span className="text-brand-accent font-bold mr-1">
+                      第{idx + 1}場
+                    </span>
+                  )}
+                  {p.year}/{pad2(p.month)}/{pad2(p.day)} (週{p.weekdayTC}){" "}
+                  {pad2(p.hour)}:{pad2(p.minute)}
+                </span>
+              </div>
+            );
+          })}
+          {speakerNames && (
             <div className="flex items-center gap-1.5">
-              <span className="text-brand-muted">
-                {event.speakers.length > 1 ? "講師" : "講師"}
-              </span>
-              <span className="truncate">
-                {event.speakers.map((s) => s.name).join(" × ")}
-              </span>
+              <span className="text-brand-muted">講師</span>
+              <span className="truncate">{speakerNames}</span>
             </div>
           )}
           {(event.location || event.eventType === "online") && (

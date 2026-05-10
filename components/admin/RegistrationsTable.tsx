@@ -46,19 +46,41 @@ const STATUS_LABEL: Record<string, string> = {
   pending: "待付款",
 };
 
+const HKT_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+function inHKT(d: Date): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+} {
+  const t = new Date(d.getTime() + HKT_OFFSET_MS);
+  return {
+    year: t.getUTCFullYear(),
+    month: t.getUTCMonth() + 1,
+    day: t.getUTCDate(),
+    hour: t.getUTCHours(),
+    minute: t.getUTCMinutes(),
+  };
+}
+
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "—";
+  const p = inHKT(d);
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${p.year}-${pad(p.month)}-${pad(p.day)} ${pad(p.hour)}:${pad(p.minute)}`;
 }
 
 function sessionLabel(s: SessionInfo): string {
-  const date = s.startDate ? new Date(s.startDate) : null;
-  const dateStr = date
-    ? `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
-    : s.id;
+  if (!s.startDate) return s.id;
+  const d = new Date(s.startDate);
+  if (isNaN(d.getTime())) return s.id;
+  const p = inHKT(d);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const dateStr = `${p.year}/${pad(p.month)}/${pad(p.day)} ${pad(p.hour)}:${pad(p.minute)}`;
   return s.location ? `${dateStr} · ${s.location}` : dateStr;
 }
 
