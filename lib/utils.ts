@@ -58,3 +58,27 @@ export function priceLabel(isFree: boolean, priceHkd?: number): string {
   if (isFree || !priceHkd) return "免費";
   return `HK$${priceHkd.toLocaleString("en-HK")}`;
 }
+
+/**
+ * Returns a vague availability label so we don't expose exact remaining count.
+ *  - capacity null  → "尚有位置" (unlimited)
+ *  - 0 remaining    → "名額已滿"
+ *  - <= 35% left    → "尚餘少量位置"
+ *  - otherwise      → "尚有位置"
+ */
+export function availabilityLabel(
+  seatsRemaining: number | null | undefined,
+  capacity: number | null | undefined
+): { text: string; tone: "open" | "low" | "full" } {
+  if (capacity == null || seatsRemaining == null) {
+    return { text: "尚有位置", tone: "open" };
+  }
+  if (seatsRemaining <= 0) {
+    return { text: "名額已滿", tone: "full" };
+  }
+  const ratio = seatsRemaining / capacity;
+  if (ratio <= 0.35) {
+    return { text: "尚餘少量位置", tone: "low" };
+  }
+  return { text: "尚有位置", tone: "open" };
+}

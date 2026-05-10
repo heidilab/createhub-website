@@ -15,7 +15,7 @@ import {
 } from "@/lib/registrations";
 import { getSessionUser } from "@/lib/firebase/session";
 import { toDate, formatEventDate, formatTime24 } from "@/lib/date";
-import { categoryLabel, eventTypeLabel } from "@/lib/utils";
+import { categoryLabel, eventTypeLabel, availabilityLabel } from "@/lib/utils";
 import RegistrationForm from "@/components/events/RegistrationForm";
 import JsonLd from "@/components/seo/JsonLd";
 import { eventJsonLd } from "@/lib/jsonld";
@@ -163,18 +163,26 @@ export default async function EventDetailPage({
                         <span className="pill-tag-accent text-[10px]">
                           已報名
                         </span>
-                      ) : s.isFull ? (
-                        <span className="inline-flex items-center px-2.5 py-1 text-[10px] font-bold tracking-[0.15em] uppercase bg-red-50 text-red-700 border border-red-200">
-                          已滿額
-                        </span>
-                      ) : s.seatsRemaining !== null ? (
-                        <span className="text-[11px] text-brand-muted">
-                          剩餘 {s.seatsRemaining} / {s.capacity} 個名額
-                        </span>
                       ) : (
-                        <span className="text-[11px] text-brand-softer">
-                          名額不限
-                        </span>
+                        (() => {
+                          const a = availabilityLabel(
+                            s.seatsRemaining,
+                            s.capacity ?? null
+                          );
+                          const cls =
+                            a.tone === "full"
+                              ? "bg-red-50 text-red-700 border-red-200"
+                              : a.tone === "low"
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : "bg-green-50 text-green-700 border-green-200";
+                          return (
+                            <span
+                              className={`inline-flex items-center px-2.5 py-1 text-[10px] font-bold tracking-[0.15em] uppercase border ${cls}`}
+                            >
+                              {a.text}
+                            </span>
+                          );
+                        })()
                       )}
                     </div>
                   </div>

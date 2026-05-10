@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, Lock } from "lucide-react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { formatEventDate } from "@/lib/date";
+import { availabilityLabel } from "@/lib/utils";
 
 export interface SessionOption {
   id: string;
@@ -288,14 +289,20 @@ export default function RegistrationForm({
                         <span className="text-brand-accent font-semibold">
                           你已報名此場
                         </span>
-                      ) : s.isFull ? (
-                        <span className="text-red-600 font-semibold">已滿額</span>
-                      ) : s.seatsRemaining !== null ? (
-                        <span className="text-brand-muted">
-                          剩餘 {s.seatsRemaining} / {s.capacity} 個名額
-                        </span>
                       ) : (
-                        <span className="text-brand-softer">名額不限</span>
+                        (() => {
+                          const a = availabilityLabel(
+                            s.seatsRemaining,
+                            s.capacity ?? null
+                          );
+                          const cls =
+                            a.tone === "full"
+                              ? "text-red-600 font-semibold"
+                              : a.tone === "low"
+                                ? "text-amber-700 font-semibold"
+                                : "text-green-700 font-semibold";
+                          return <span className={cls}>{a.text}</span>;
+                        })()
                       )}
                     </div>
                   </div>
