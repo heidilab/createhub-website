@@ -137,7 +137,13 @@ export async function getPublishedEvents(opts?: {
 
     const now = new Date();
     if (opts?.status === "upcoming") {
-      q = q.where("eventDate", ">=", now).orderBy("eventDate", "asc");
+      // Filter by status too so we reuse the existing
+      // (isPublished + status + eventDate ASC) composite index
+      // and exclude cancelled events that haven't passed yet.
+      q = q
+        .where("status", "==", "upcoming")
+        .where("eventDate", ">=", now)
+        .orderBy("eventDate", "asc");
     } else if (opts?.status === "past") {
       q = q.where("eventDate", "<", now).orderBy("eventDate", "desc");
     } else {
