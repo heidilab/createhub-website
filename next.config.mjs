@@ -18,14 +18,6 @@ const nextConfig = {
       bodySizeLimit: "10mb",
     },
   },
-  async rewrites() {
-    return [
-      {
-        source: "/__/auth/:path*",
-        destination: "https://createhub-website.firebaseapp.com/__/auth/:path*",
-      },
-    ];
-  },
 };
 
 export default nextConfig;
