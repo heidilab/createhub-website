@@ -1,15 +1,32 @@
 import Link from "next/link";
 import { Plus, Edit2, Users } from "lucide-react";
 import { adminDb } from "@/lib/firebase/admin";
-import { formatEventDate } from "@/lib/date";
+import { formatEventDate, hktParts } from "@/lib/date";
 import { categoryLabel, eventTypeLabel } from "@/lib/utils";
+import { getSessionRegistrationCounts } from "@/lib/registrations";
 import type { Event } from "@/types";
 
 export const dynamic = "force-dynamic";
 
-async function getAllEvents(): Promise<
-  Array<Event & { registrationCount: number }>
-> {
+interface SessionShape {
+  id: string;
+  startDate?: unknown;
+  capacity?: number | null;
+}
+
+interface EventRow extends Event {
+  sessionRows: Array<{
+    id: string;
+    startDate: unknown;
+    capacity: number | null;
+    count: number;
+  }>;
+  totalCount: number;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+async function getAllEvents(): Promise<EventRow[]> {
   const db = adminDb();
   try {
     const snap = await db
@@ -20,22 +37,41 @@ async function getAllEvents(): Promise<
       (d) => ({ id: d.id, ...(d.data() as Omit<Event, "id">) } as Event)
     );
 
-    const withCounts = await Promise.all(
+    const withRows = await Promise.all(
       events.map(async (e) => {
-        let count = 0;
-        try {
-          const c = await db
-            .collection("registrations")
-            .where("eventId", "==", e.id)
-            .where("status", "==", "confirmed")
-            .count()
-            .get();
-          count = c.data().count;
-        } catch {}
-        return { ...e, registrationCount: count };
+        // Normalize sessions (support legacy events without sessions array)
+        const rawSessions: SessionShape[] =
+          Array.isArray((e as unknown as { sessions?: unknown }).sessions) &&
+          (e as unknown as { sessions: SessionShape[] }).sessions.length > 0
+            ? (e as unknown as { sessions: SessionShape[] }).sessions
+            : [
+                {
+                  id: "default",
+                  startDate: e.eventDate,
+                  capacity:
+                    typeof e.capacity === "number" ? e.capacity : null,
+                },
+              ];
+
+        // Per-session counts
+        const counts = await getSessionRegistrationCounts(e.id);
+
+        const sessionRows = rawSessions.map((s) => ({
+          id: s.id,
+          startDate: s.startDate,
+          capacity:
+            typeof s.capacity === "number" && s.capacity > 0
+              ? s.capacity
+              : null,
+          count: counts[s.id] ?? 0,
+        }));
+
+        const totalCount = sessionRows.reduce((sum, r) => sum + r.count, 0);
+
+        return { ...e, sessionRows, totalCount };
       })
     );
-    return withCounts;
+    return withRows;
   } catch (err) {
     console.warn("[admin events list]", err);
     return [];
@@ -71,8 +107,8 @@ export default async function AdminEventsPage() {
               <tr className="text-left">
                 <Th>活動名稱</Th>
                 <Th>類別 / 形式</Th>
-                <Th>日期</Th>
-                <Th>報名</Th>
+                <Th>場次 · 日期</Th>
+                <Th>報名 / 名額</Th>
                 <Th>狀態</Th>
                 <Th>操作</Th>
               </tr>
@@ -80,7 +116,7 @@ export default async function AdminEventsPage() {
             <tbody className="divide-y divide-brand-hair">
               {events.map((e) => (
                 <tr key={e.id} className="hover:bg-brand-bg/50">
-                  <td className="p-3">
+                  <td className="p-3 align-top">
                     <div className="font-semibold text-brand-text max-w-xs truncate">
                       {e.title}
                     </div>
@@ -94,30 +130,71 @@ export default async function AdminEventsPage() {
                       </div>
                     ) : null}
                   </td>
-                  <td className="p-3">
+                  <td className="p-3 align-top">
                     <div className="flex flex-wrap gap-1">
-                      <span className="tag-type">{categoryLabel(e.category)}</span>
-                      <span className="tag-loc">{eventTypeLabel(e.eventType)}</span>
+                      <span className="tag-type">
+                        {categoryLabel(e.category)}
+                      </span>
+                      <span className="tag-loc">
+                        {eventTypeLabel(e.eventType)}
+                      </span>
                     </div>
                   </td>
-                  <td className="p-3 text-brand-muted whitespace-nowrap">
-                    {formatEventDate(e.eventDate)}
-                  </td>
-                  <td className="p-3">
-                    <span className="font-serif text-[16px] text-brand-dark font-bold">
-                      {e.registrationCount}
-                    </span>
-                    {e.capacity && (
-                      <span className="text-[11px] text-brand-softer"> / {e.capacity}</span>
+                  <td className="p-3 align-top text-brand-muted whitespace-nowrap">
+                    {e.sessionRows.length === 1 ? (
+                      <div>{formatEventDate(e.sessionRows[0].startDate as never)}</div>
+                    ) : (
+                      <div className="space-y-1">
+                        {e.sessionRows.map((s, idx) => {
+                          const p = hktParts(s.startDate as never);
+                          return (
+                            <div
+                              key={s.id}
+                              className="flex items-baseline gap-2"
+                            >
+                              <span className="text-[10px] text-brand-accent font-bold tracking-[0.15em] uppercase">
+                                第{idx + 1}場
+                              </span>
+                              <span>
+                                {p
+                                  ? `${p.year}/${pad2(p.month)}/${pad2(p.day)} ${pad2(p.hour)}:${pad2(p.minute)}`
+                                  : "—"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </td>
-                  <td className="p-3">
+                  <td className="p-3 align-top">
+                    {e.sessionRows.length === 1 ? (
+                      <CountCell
+                        count={e.sessionRows[0].count}
+                        capacity={e.sessionRows[0].capacity}
+                      />
+                    ) : (
+                      <div className="space-y-1">
+                        {e.sessionRows.map((s, idx) => (
+                          <div
+                            key={s.id}
+                            className="flex items-baseline gap-2"
+                          >
+                            <span className="text-[10px] text-brand-accent font-bold tracking-[0.15em] uppercase">
+                              第{idx + 1}場
+                            </span>
+                            <CountCell count={s.count} capacity={s.capacity} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-3 align-top">
                     <StatusBadge
                       isPublished={e.isPublished}
                       status={e.status}
                     />
                   </td>
-                  <td className="p-3 whitespace-nowrap">
+                  <td className="p-3 align-top whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       <Link
                         href={`/admin/events/${e.id}/registrations`}
@@ -166,6 +243,33 @@ function Th({ children }: { children: React.ReactNode }) {
     <th className="p-3 text-[10px] text-brand-softer tracking-[0.15em] uppercase font-semibold">
       {children}
     </th>
+  );
+}
+
+function CountCell({
+  count,
+  capacity,
+}: {
+  count: number;
+  capacity: number | null;
+}) {
+  const isFull = capacity != null && count >= capacity;
+  return (
+    <span className="inline-flex items-baseline gap-0.5">
+      <span
+        className={`font-serif text-[15px] font-bold ${
+          isFull ? "text-red-600" : "text-brand-dark"
+        }`}
+      >
+        {count}
+      </span>
+      {capacity != null && (
+        <span className="text-[11px] text-brand-softer"> / {capacity}</span>
+      )}
+      {capacity == null && (
+        <span className="text-[11px] text-brand-softer">　不限</span>
+      )}
+    </span>
   );
 }
 
