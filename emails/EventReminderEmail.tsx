@@ -18,7 +18,14 @@ interface Props {
   zoomLink?: string;
   speakerNames?: string;
   eventUrl?: string;
+  /** 1 = "聽日" reminder (T-1); 2 = "後日" reminder (T-2) */
+  daysUntil?: 1 | 2;
 }
+
+const WHEN_LABEL: Record<1 | 2, string> = {
+  1: "聽日",
+  2: "後日",
+};
 
 export default function EventReminderEmail({
   fullName = "會員",
@@ -29,15 +36,17 @@ export default function EventReminderEmail({
   zoomLink = "",
   speakerNames = "",
   eventUrl = "https://www.createhub.biz/events",
+  daysUntil = 1,
 }: Props) {
+  const when = WHEN_LABEL[daysUntil];
   return (
-    <EmailShell previewText={`【活動提醒】聽日見：${eventTitle}`}>
+    <EmailShell previewText={`【活動提醒】${when}見：${eventTitle}`}>
       <Text style={eyebrowStyle}>Event Reminder</Text>
       <div style={ruleStyle} />
-      <Text style={h1Style}>聽日活動提醒</Text>
+      <Text style={h1Style}>{when}活動提醒</Text>
 
       <Text style={bodyStyle}>
-        {fullName}，溫馨提醒：你報名嘅活動 <strong>聽日</strong> 就會舉行。
+        {fullName}，溫馨提醒：你報名嘅活動 <strong>{when}</strong> 就會舉行。
       </Text>
 
       <div
@@ -113,7 +122,7 @@ export default function EventReminderEmail({
       </div>
 
       <Text style={{ ...bodyStyle, fontSize: "12px", color: COLORS.softer }}>
-        我哋期待聽日喺活動見到你！
+        我哋期待{when}喺活動見到你！
       </Text>
     </EmailShell>
   );

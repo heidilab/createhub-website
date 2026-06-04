@@ -23,6 +23,16 @@ interface SpeakerShape {
   name?: string;
 }
 
+interface ReminderWindow {
+  daysUntil: 1 | 2;
+  /** Field on the registration doc that records idempotency for this window. */
+  flagField: "reminderSentAt" | "reminderTwoDaysSentAt";
+  /** HKT YYYY-MM-DD date string we're targeting (today + daysUntil). */
+  targetHKT: string;
+  /** Subject prefix wording. */
+  whenLabel: "聽日" | "後日";
+}
+
 /**
  * Returns the YYYY-MM-DD HKT date string for a Date (UTC instant).
  */
@@ -50,13 +60,27 @@ export async function GET(req: Request) {
   }
 
   const now = new Date();
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const tomorrowHKT = hktDateString(tomorrow);
+  const windows: ReminderWindow[] = [
+    {
+      daysUntil: 1,
+      flagField: "reminderSentAt",
+      targetHKT: hktDateString(new Date(now.getTime() + 24 * 60 * 60 * 1000)),
+      whenLabel: "聽日",
+    },
+    {
+      daysUntil: 2,
+      flagField: "reminderTwoDaysSentAt",
+      targetHKT: hktDateString(
+        new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000)
+      ),
+      whenLabel: "後日",
+    },
+  ];
 
   const db = adminDb();
 
-  // Fetch all upcoming events within a 7-day window (covers any session starting tomorrow).
-  const horizon = new Date(now.getTime() + 8 * 24 * 60 * 60 * 1000);
+  // Fetch all upcoming events within a window (covers any session starting in next ~8 days).
+  const horizon = new Date(now.getTime() + 9 * 24 * 60 * 60 * 1000);
   const eventsSnap = await db
     .collection("events")
     .where("isPublished", "==", true)
@@ -67,6 +91,7 @@ export async function GET(req: Request) {
   let totalSent = 0;
   let totalFailed = 0;
   const summary: Array<{
+    daysUntil: number;
     eventId: string;
     sessionId: string;
     recipients: number;
@@ -102,105 +127,113 @@ export async function GET(req: Request) {
     const isOnline = event.eventType === "online";
     const eventUrl = `${SITE_URL}/events/${eventId}`;
 
-    // Find sessions starting tomorrow HKT
-    const tomorrowSessions = sessions.filter((s) => {
-      const d = toDate(s.startDate as string | Date | null | undefined);
-      if (!d) return false;
-      return hktDateString(d) === tomorrowHKT;
-    });
-    if (tomorrowSessions.length === 0) continue;
+    // For each window, find matching sessions and send.
+    for (const w of windows) {
+      const matchedSessions = sessions.filter((s) => {
+        const d = toDate(s.startDate as string | Date | null | undefined);
+        if (!d) return false;
+        return hktDateString(d) === w.targetHKT;
+      });
+      if (matchedSessions.length === 0) continue;
 
-    for (const sess of tomorrowSessions) {
-      // Fetch confirmed registrations for this session
-      const regSnap = await db
-        .collection("registrations")
-        .where("eventId", "==", eventId)
-        .where("sessionId", "==", sess.id)
-        .where("paymentStatus", "in", ["paid", "free"])
-        .get();
-
-      // Back-compat: if "default" session and no registrations have a sessionId,
-      // fall back to event-level registrations
-      let regs = regSnap.docs;
-      if (sess.id === "default" && regs.length === 0) {
-        const fallback = await db
+      for (const sess of matchedSessions) {
+        // Fetch confirmed registrations for this session
+        const regSnap = await db
           .collection("registrations")
           .where("eventId", "==", eventId)
+          .where("sessionId", "==", sess.id)
           .where("paymentStatus", "in", ["paid", "free"])
           .get();
-        regs = fallback.docs.filter((d) => {
-          const sid = (d.data() as { sessionId?: string }).sessionId;
-          return !sid || sid === "default";
+
+        // Back-compat: if "default" session and no registrations have a sessionId,
+        // fall back to event-level registrations
+        let regs = regSnap.docs;
+        if (sess.id === "default" && regs.length === 0) {
+          const fallback = await db
+            .collection("registrations")
+            .where("eventId", "==", eventId)
+            .where("paymentStatus", "in", ["paid", "free"])
+            .get();
+          regs = fallback.docs.filter((d) => {
+            const sid = (d.data() as { sessionId?: string }).sessionId;
+            return !sid || sid === "default";
+          });
+        }
+
+        const sessionDateText = formatEventDate(
+          sess.startDate as string | Date | null | undefined
+        );
+        const sessionLocation =
+          (sess.location as string | undefined) ??
+          (event.location as string | undefined) ??
+          "";
+        const sessionZoom =
+          (sess.zoomLink as string | undefined) ??
+          (event.zoomLink as string | undefined) ??
+          "";
+
+        let recipientsCount = 0;
+
+        await Promise.all(
+          regs.map(async (regDoc) => {
+            const reg = regDoc.data() as {
+              userEmail?: string;
+              userName?: string;
+              reminderSentAt?: unknown;
+              reminderTwoDaysSentAt?: unknown;
+            };
+            if (!reg.userEmail) return;
+            // Idempotency: skip if THIS window's reminder already sent
+            if (reg[w.flagField]) return;
+
+            try {
+              await resend!.emails.send({
+                from: FROM,
+                to: reg.userEmail,
+                subject: `【提醒】${w.whenLabel}見：${event.title}`,
+                react: EventReminderEmail({
+                  fullName: reg.userName || reg.userEmail,
+                  eventTitle: event.title,
+                  eventDateText: sessionDateText,
+                  location: sessionLocation,
+                  isOnline,
+                  zoomLink: sessionZoom,
+                  speakerNames,
+                  eventUrl,
+                  daysUntil: w.daysUntil,
+                }),
+              });
+              await regDoc.ref.update({ [w.flagField]: new Date() });
+              totalSent += 1;
+              recipientsCount += 1;
+            } catch (err) {
+              console.warn(
+                `[cron reminder T-${w.daysUntil}] failed for`,
+                reg.userEmail,
+                ":",
+                err
+              );
+              totalFailed += 1;
+            }
+          })
+        );
+
+        summary.push({
+          daysUntil: w.daysUntil,
+          eventId,
+          sessionId: sess.id,
+          recipients: recipientsCount,
         });
       }
-
-      const sessionDateText = formatEventDate(
-        sess.startDate as string | Date | null | undefined
-      );
-      const sessionLocation =
-        (sess.location as string | undefined) ??
-        (event.location as string | undefined) ??
-        "";
-      const sessionZoom =
-        (sess.zoomLink as string | undefined) ??
-        (event.zoomLink as string | undefined) ??
-        "";
-
-      let recipientsCount = 0;
-
-      await Promise.all(
-        regs.map(async (regDoc) => {
-          const reg = regDoc.data() as {
-            userEmail?: string;
-            userName?: string;
-            reminderSentAt?: unknown;
-          };
-          if (!reg.userEmail) return;
-          // Idempotency: skip if reminder already sent
-          if (reg.reminderSentAt) return;
-
-          try {
-            await resend!.emails.send({
-              from: FROM,
-              to: reg.userEmail,
-              subject: `【提醒】聽日見：${event.title}`,
-              react: EventReminderEmail({
-                fullName: reg.userName || reg.userEmail,
-                eventTitle: event.title,
-                eventDateText: sessionDateText,
-                location: sessionLocation,
-                isOnline,
-                zoomLink: sessionZoom,
-                speakerNames,
-                eventUrl,
-              }),
-            });
-            await regDoc.ref.update({ reminderSentAt: new Date() });
-            totalSent += 1;
-            recipientsCount += 1;
-          } catch (err) {
-            console.warn(
-              "[cron reminder] failed for",
-              reg.userEmail,
-              ":",
-              err
-            );
-            totalFailed += 1;
-          }
-        })
-      );
-
-      summary.push({
-        eventId,
-        sessionId: sess.id,
-        recipients: recipientsCount,
-      });
     }
   }
 
   return NextResponse.json({
     ok: true,
-    tomorrowHKT,
+    windows: windows.map((w) => ({
+      daysUntil: w.daysUntil,
+      targetHKT: w.targetHKT,
+    })),
     sent: totalSent,
     failed: totalFailed,
     summary,
