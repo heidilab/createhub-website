@@ -21,9 +21,10 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen flex bg-brand-bg pt-[5px]">
+    <div className="min-h-screen bg-brand-bg">
       <AdminSidebar adminName={user.fullName || user.email} />
-      <div className="flex-1 min-w-0">{children}</div>
+      {/* Sidebar is fixed; offset content on lg+ by sidebar width */}
+      <main className="lg:pl-64 min-w-0">{children}</main>
     </div>
   );
 }
