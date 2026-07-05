@@ -187,24 +187,41 @@ export default function EventForm({ mode, initial }: Props) {
     );
 
   // ── Speaker emails ──────────────────────────────────────────
-  const commitSpeakerEmail = () => {
-    const raw = speakerEmailInput.trim();
-    if (!raw) return;
-    // Allow comma- or space-separated
-    const candidates = raw
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  /**
+   * Pure parser — returns the merged deduped list plus any invalid tokens.
+   * Used by both the "Enter/加入" handler and the submit handler (so pending
+   * text is never silently dropped).
+   */
+  const parsePendingEmails = (
+    raw: string,
+    existing: string[]
+  ): { merged: string[]; invalid: string[] } => {
+    const trimmed = raw.trim();
+    if (!trimmed) return { merged: existing, invalid: [] };
+    const candidates = trimmed
       .split(/[,;\s]+/)
       .map((e) => e.trim())
       .filter(Boolean);
-    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const valid = candidates.filter((e) => emailRe.test(e));
-    const invalid = candidates.filter((e) => !emailRe.test(e));
+    const valid = candidates.filter((e) => EMAIL_RE.test(e));
+    const invalid = candidates.filter((e) => !EMAIL_RE.test(e));
+    const merged = Array.from(
+      new Set([...existing, ...valid].map((e) => e.toLowerCase()))
+    );
+    return { merged, invalid };
+  };
+
+  const commitSpeakerEmail = () => {
+    const { merged, invalid } = parsePendingEmails(
+      speakerEmailInput,
+      speakerEmails
+    );
     if (invalid.length > 0) {
       setError(`電郵格式無效：${invalid.join(", ")}`);
       return;
     }
-    setSpeakerEmails((arr) =>
-      Array.from(new Set([...arr, ...valid].map((e) => e.toLowerCase())))
-    );
+    setSpeakerEmails(merged);
     setSpeakerEmailInput("");
     setError("");
   };
@@ -238,6 +255,22 @@ export default function EventForm({ mode, initial }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    // Auto-commit any pending speaker email in the input box before submit
+    // (so admin doesn't need to remember pressing Enter — the biggest UX trap).
+    const { merged: finalSpeakerEmails, invalid } = parsePendingEmails(
+      speakerEmailInput,
+      speakerEmails
+    );
+    if (invalid.length > 0) {
+      setError(`講師電郵格式無效：${invalid.join(", ")}`);
+      return;
+    }
+    // Sync UI state so the chip appears + input clears
+    if (finalSpeakerEmails.length !== speakerEmails.length) {
+      setSpeakerEmails(finalSpeakerEmails);
+      setSpeakerEmailInput("");
+    }
 
     // Validate at least one speaker name
     const validSpeakers = speakers
@@ -286,7 +319,7 @@ export default function EventForm({ mode, initial }: Props) {
       eventType: form.eventType,
       category: form.category,
       speakers: validSpeakers,
-      speakerEmails,
+      speakerEmails: finalSpeakerEmails,
       sessions: sessionsPayload,
       isFree: form.isFree,
       priceHkd: Number(form.priceHkd) || 0,
@@ -723,6 +756,10 @@ export default function EventForm({ mode, initial }: Props) {
                 commitSpeakerEmail();
               }
             }}
+            onBlur={() => {
+              // Auto-commit when input loses focus so admin doesn't need to remember Enter
+              if (speakerEmailInput.trim()) commitSpeakerEmail();
+            }}
             className="input flex-1"
             placeholder="speaker@example.com（按 Enter 加入）"
           />
@@ -734,6 +771,11 @@ export default function EventForm({ mode, initial }: Props) {
             加入
           </button>
         </div>
+        {speakerEmailInput.trim() && (
+          <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2">
+            ⚠️ 你打咗 <strong>{speakerEmailInput.trim()}</strong> 但未加入。撳「加入」或 Enter，儲存時亦會自動加入。
+          </div>
+        )}
       </Section>
 
       {/* Pricing */}
