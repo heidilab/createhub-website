@@ -3,9 +3,12 @@
 import { useEditor, EditorContent, Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
-import TextStyle from "@tiptap/extension-text-style";
-import Color from "@tiptap/extension-color";
-import FontFamily from "@tiptap/extension-font-family";
+import {
+  TextStyle,
+  Color,
+  FontFamily,
+  FontSize,
+} from "@tiptap/extension-text-style";
 import { useState, useRef, useEffect } from "react";
 import {
   Bold,
@@ -50,29 +53,31 @@ const FONT_SIZES: Array<{
 }> = [
   {
     label: "細",
-    action: (e) => e.chain().focus().setParagraph().run(), // fallback: small handled via style
-    isActive: () => false,
+    action: (e) =>
+      e.chain().focus().setParagraph().setFontSize("12px").run(),
+    isActive: (e) =>
+      e.getAttributes("textStyle").fontSize === "12px",
   },
   {
     label: "正常",
-    action: (e) => e.chain().focus().setParagraph().run(),
+    action: (e) =>
+      e.chain().focus().setParagraph().unsetFontSize().run(),
     isActive: (e) =>
-      e.isActive("paragraph") &&
-      !e.isActive("heading") &&
-      !e.isActive("bulletList") &&
-      !e.isActive("orderedList"),
+      e.isActive("paragraph") && !e.getAttributes("textStyle").fontSize,
   },
   {
     label: "大",
     action: (e) =>
-      e.chain().focus().toggleHeading({ level: 4 }).run(),
-    isActive: (e) => e.isActive("heading", { level: 4 }),
+      e.chain().focus().setParagraph().setFontSize("18px").run(),
+    isActive: (e) =>
+      e.getAttributes("textStyle").fontSize === "18px",
   },
   {
     label: "特大",
     action: (e) =>
-      e.chain().focus().toggleHeading({ level: 3 }).run(),
-    isActive: (e) => e.isActive("heading", { level: 3 }),
+      e.chain().focus().setParagraph().setFontSize("24px").run(),
+    isActive: (e) =>
+      e.getAttributes("textStyle").fontSize === "24px",
   },
   {
     label: "標題 1",
@@ -138,6 +143,7 @@ export default function RichTextEditor({
       TextStyle,
       Color,
       FontFamily,
+      FontSize,
     ],
     content: value || "",
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
