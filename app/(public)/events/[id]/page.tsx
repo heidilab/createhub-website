@@ -16,6 +16,7 @@ import {
 import { getSessionUser } from "@/lib/firebase/session";
 import { toDate, formatEventDate, formatTime24 } from "@/lib/date";
 import { categoryLabel, eventTypeLabel, availabilityLabel } from "@/lib/utils";
+import { descriptionToHtml, stripHtml } from "@/lib/richtext";
 import RegistrationForm from "@/components/events/RegistrationForm";
 import JsonLd from "@/components/seo/JsonLd";
 import { eventJsonLd } from "@/lib/jsonld";
@@ -27,7 +28,7 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
   if (!event) return { title: "活動不存在" };
   return {
     title: event.title,
-    description: event.description?.slice(0, 160),
+    description: stripHtml(event.description).slice(0, 160),
   };
 }
 
@@ -66,7 +67,7 @@ export default async function EventDetailPage({
   const schema = eventJsonLd({
     id: event.id,
     title: event.title,
-    description: event.description,
+    description: stripHtml(event.description),
     eventDateIso: firstSessionStart?.toISOString() ?? "",
     endDateIso: firstSessionEnd?.toISOString(),
     location: firstSession?.location,
@@ -193,9 +194,18 @@ export default async function EventDetailPage({
             {/* Description */}
             <div className="glass-card rounded-3xl p-7 lg:p-9">
               <div className="pill-tag-accent inline-flex mb-4">活動內容</div>
-              <div className="prose prose-sm max-w-none text-[15px] text-brand-text/85 leading-[1.95] whitespace-pre-wrap">
-                {event.description || "活動詳情陸續公布。"}
-              </div>
+              {event.description ? (
+                <div
+                  className="rte-content"
+                  dangerouslySetInnerHTML={{
+                    __html: descriptionToHtml(event.description),
+                  }}
+                />
+              ) : (
+                <div className="text-[15px] text-brand-text/85 leading-[1.95]">
+                  活動詳情陸續公布。
+                </div>
+              )}
             </div>
 
             {/* Speakers */}

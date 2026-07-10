@@ -15,6 +15,7 @@ import {
 import { slugify } from "@/lib/utils";
 import type { Event, Speaker } from "@/types";
 import { toDate } from "@/lib/date";
+import RichTextEditor from "@/components/admin/RichTextEditor";
 
 function toLocalInput(d: Date | null): string {
   if (!d) return "";
@@ -392,12 +393,11 @@ export default function EventForm({ mode, initial }: Props) {
         </Field>
 
         <Field label="活動描述" required>
-          <textarea
-            required
+          <RichTextEditor
             value={form.description}
-            onChange={(e) => updateField("description", e.target.value)}
-            className="input min-h-[160px]"
+            onChange={(html) => updateField("description", html)}
             placeholder="介紹活動內容、參加者可以學到什麼、活動流程等..."
+            minHeight="220px"
           />
         </Field>
       </Section>
