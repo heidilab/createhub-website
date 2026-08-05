@@ -59,6 +59,8 @@ export default async function AdminRegistrationsPage({
         paymentStatus?: string;
         status?: string;
         registeredAt?: unknown;
+        reminderSentAt?: unknown;
+        reminderTwoDaysSentAt?: unknown;
       };
       const profile = r.userId ? userMap.get(r.userId) : undefined;
       return {
@@ -70,6 +72,8 @@ export default async function AdminRegistrationsPage({
         status: r.status ?? "confirmed",
         paymentStatus: r.paymentStatus ?? "free",
         registeredAt: serializeDate(r.registeredAt) ?? null,
+        reminderSentAt: serializeDate(r.reminderSentAt) ?? null,
+        reminderTwoDaysSentAt: serializeDate(r.reminderTwoDaysSentAt) ?? null,
       };
     })
     .sort((a, b) => (b.registeredAt ?? "").localeCompare(a.registeredAt ?? ""));

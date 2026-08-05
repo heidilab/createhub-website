@@ -13,6 +13,8 @@ interface RegistrationRow {
   status: string;
   paymentStatus: string;
   registeredAt: string | null;
+  reminderSentAt?: string | null;
+  reminderTwoDaysSentAt?: string | null;
 }
 
 interface SessionInfo {
@@ -218,6 +220,7 @@ export default function RegistrationsTable({
                     <Th>WhatsApp</Th>
                     <Th>狀態</Th>
                     <Th>報名時間</Th>
+                    <Th>提醒 Email</Th>
                     <Th>操作</Th>
                   </tr>
                 </thead>
@@ -243,6 +246,12 @@ export default function RegistrationsTable({
                       </td>
                       <td className="p-3 text-brand-softer whitespace-nowrap">
                         {formatDate(r.registeredAt)}
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        <ReminderStatus
+                          reminderSentAt={r.reminderSentAt}
+                          reminderTwoDaysSentAt={r.reminderTwoDaysSentAt}
+                        />
                       </td>
                       <td className="p-3 whitespace-nowrap">
                         <div className="flex items-center gap-3">
@@ -405,6 +414,45 @@ function Th({ children }: { children: React.ReactNode }) {
     <th className="p-3 text-[10px] text-brand-softer tracking-[0.15em] uppercase font-semibold">
       {children}
     </th>
+  );
+}
+
+function ReminderStatus({
+  reminderSentAt,
+  reminderTwoDaysSentAt,
+}: {
+  reminderSentAt?: string | null;
+  reminderTwoDaysSentAt?: string | null;
+}) {
+  const shortDate = (iso: string): string => {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const p = inHKT(d);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(p.month)}/${pad(p.day)} ${pad(p.hour)}:${pad(p.minute)}`;
+  };
+
+  if (!reminderSentAt && !reminderTwoDaysSentAt) {
+    return (
+      <span className="text-[10px] bg-brand-softer/15 text-brand-softer px-2 py-[2px] font-semibold tracking-wider">
+        未發送
+      </span>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      {reminderTwoDaysSentAt && (
+        <div className="text-[10px] text-green-700" title="活動兩日前提醒">
+          ✓ T-2 · {shortDate(reminderTwoDaysSentAt)}
+        </div>
+      )}
+      {reminderSentAt && (
+        <div className="text-[10px] text-green-700" title="活動前一日提醒">
+          ✓ T-1 · {shortDate(reminderSentAt)}
+        </div>
+      )}
+    </div>
   );
 }
 
