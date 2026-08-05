@@ -6,6 +6,7 @@ import { getEventById } from "@/lib/events";
 import { formatEventDate } from "@/lib/date";
 import { serializeDate } from "@/lib/serialize";
 import RegistrationsTable from "@/components/admin/RegistrationsTable";
+import SendVenueEmailButton from "@/components/admin/SendVenueEmailButton";
 
 export const dynamic = "force-dynamic";
 
@@ -138,8 +139,8 @@ export default async function AdminRegistrationsPage({
         </p>
       </header>
 
-      {/* Export buttons */}
-      <div className="flex items-center gap-3 mb-8">
+      {/* Export + actions */}
+      <div className="flex flex-wrap items-center gap-3 mb-8">
         <a
           href={`/api/admin/events/${event.id}/registrations/export?format=xlsx`}
           className="inline-flex items-center gap-2 bg-brand-dark text-white px-5 py-2.5 text-[13px] font-bold tracking-wide hover:bg-brand-text transition"
@@ -154,6 +155,10 @@ export default async function AdminRegistrationsPage({
         >
           匯出 PDF（列印）
         </a>
+        <SendVenueEmailButton
+          eventId={event.id}
+          defaultAddress={event.sessions[0]?.location ?? ""}
+        />
       </div>
 
       <RegistrationsTable
