@@ -47,15 +47,12 @@ async function ensureProfile(
 
   await setDoc(ref, { ...profile, createdAt: serverTimestamp() });
 
-  // Trigger welcome email (server route)
+  // Trigger welcome email (server route reads email/name from the profile)
   try {
+    const idToken = await user.getIdToken();
     await fetch("/api/emails/welcome", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: profile.email,
-        fullName: profile.fullName,
-      }),
+      headers: { Authorization: `Bearer ${idToken}` },
     });
   } catch {
     // non-fatal

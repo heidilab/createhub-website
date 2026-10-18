@@ -46,9 +46,17 @@ function hktDateString(d: Date): string {
 
 export async function GET(req: Request) {
   // ── Auth ─────────────────────────────────────────────
+  // Fail closed: without CRON_SECRET anyone could trigger reminder emails.
   const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    console.error("[cron reminder] CRON_SECRET is not configured");
+    return NextResponse.json(
+      { error: "CRON_SECRET not configured" },
+      { status: 500 }
+    );
+  }
   const auth = req.headers.get("authorization");
-  if (cronSecret && auth !== `Bearer ${cronSecret}`) {
+  if (auth !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -79,13 +87,18 @@ export async function GET(req: Request) {
 
   const db = adminDb();
 
-  // Fetch all upcoming events within a window (covers any session starting in next ~8 days).
-  const horizon = new Date(now.getTime() + 9 * 24 * 60 * 60 * 1000);
+  // eventDate mirrors the FIRST session, so a multi-session event whose first
+  // session is already over still has later sessions to remind about. Fetch the
+  // most recent events that started on/before the horizon (no lower bound) and
+  // let the per-session date match below pick the right ones.
+  // Uses the existing (isPublished ASC, eventDate DESC) index.
+  const horizon = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
   const eventsSnap = await db
     .collection("events")
     .where("isPublished", "==", true)
-    .where("eventDate", ">=", now)
     .where("eventDate", "<=", horizon)
+    .orderBy("eventDate", "desc")
+    .limit(200)
     .get();
 
   let totalSent = 0;

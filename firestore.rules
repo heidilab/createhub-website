@@ -45,14 +45,14 @@ service cloud.firestore {
     }
 
     // registrations ─────────────────
+    // All writes go through server routes (Admin SDK bypasses these rules),
+    // which enforce capacity, duplicate checks and Stripe payment. Clients
+    // must never create or edit registrations directly, otherwise a member
+    // could write paymentStatus: "paid" for an event they never paid for.
     match /registrations/{regId} {
       allow read: if isSignedIn() &&
         (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() &&
-        request.resource.data.userId == request.auth.uid;
-      allow update: if isSignedIn() &&
-        (resource.data.userId == request.auth.uid || isAdmin());
-      allow delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     // team members ──────────────────
