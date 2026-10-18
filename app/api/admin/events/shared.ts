@@ -122,6 +122,10 @@ export function buildEventDoc(
     });
   }
 
+  // Keep sessions chronological so the eventDate mirror is the earliest one —
+  // the reminder cron and listings rely on that.
+  sessions.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+
   // ── Derive top-level fields from first session for sort/query compat ──
   const first = sessions[0];
 
