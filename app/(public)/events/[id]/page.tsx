@@ -23,8 +23,9 @@ import { eventJsonLd } from "@/lib/jsonld";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
-  const event = await getEventById(params.id);
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const event = await getEventById(id);
   if (!event) return { title: "活動不存在" };
   return {
     title: event.title,
@@ -35,9 +36,10 @@ export async function generateMetadata({ params }: { params: { id: string } }) {
 export default async function EventDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const event = await getEventById(params.id);
+  const { id } = await params;
+  const event = await getEventById(id);
   if (!event || !event.isPublished) notFound();
 
   const [session, sessionCounts] = await Promise.all([

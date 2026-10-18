@@ -10,9 +10,10 @@ export const metadata = { title: "報名成功" };
 export default async function EventSuccessPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const event = await getEventById(params.id);
+  const { id } = await params;
+  const event = await getEventById(id);
 
   return (
     <div className="container-narrow px-5 py-16 lg:py-24 max-w-2xl">

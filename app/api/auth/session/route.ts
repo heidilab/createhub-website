@@ -16,7 +16,8 @@ export async function POST(req: Request) {
       expiresIn: EXPIRES_IN,
     });
 
-    cookies().set(COOKIE_NAME, sessionCookie, {
+    const cookieStore = await cookies();
+    cookieStore.set(COOKIE_NAME, sessionCookie, {
       maxAge: EXPIRES_IN / 1000,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE() {
-  cookies().delete(COOKIE_NAME);
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_NAME);
   return NextResponse.json({ ok: true });
 }
