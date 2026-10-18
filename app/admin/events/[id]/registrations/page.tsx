@@ -20,9 +20,10 @@ interface UserDoc {
 export default async function AdminRegistrationsPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const event = await getEventById(params.id);
+  const { id } = await params;
+  const event = await getEventById(id);
   if (!event) notFound();
 
   const db = adminDb();
@@ -30,7 +31,7 @@ export default async function AdminRegistrationsPage({
   // Fetch all registrations for this event
   const regSnap = await db
     .collection("registrations")
-    .where("eventId", "==", params.id)
+    .where("eventId", "==", id)
     .get();
 
   // Hydrate user profiles for whatsapp + name

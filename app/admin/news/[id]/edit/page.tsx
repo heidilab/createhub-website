@@ -11,10 +11,11 @@ export const metadata = { title: "編輯文章" };
 export default async function EditArticlePage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const isNew = params.id === "new";
-  const article = isNew ? null : await getArticleById(params.id);
+  const { id } = await params;
+  const isNew = id === "new";
+  const article = isNew ? null : await getArticleById(id);
   if (!isNew && !article) notFound();
 
   return (

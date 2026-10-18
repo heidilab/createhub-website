@@ -15,13 +15,14 @@ export const metadata = {
 export default async function EventsPage({
   searchParams,
 }: {
-  searchParams?: { status?: string; type?: string; category?: string };
+  searchParams: Promise<{ status?: string; type?: string; category?: string }>;
 }) {
-  const status = (searchParams?.status as "past" | "upcoming") || "upcoming";
+  const { status: statusParam, type, category } = await searchParams;
+  const status = (statusParam as "past" | "upcoming") || "upcoming";
   const events = await getPublishedEvents({
     status,
-    eventType: searchParams?.type,
-    category: searchParams?.category,
+    eventType: type,
+    category,
   });
 
   return (

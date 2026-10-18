@@ -11,8 +11,9 @@ async function assertAdmin() {
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     await assertAdmin();
     const body = await req.json();
@@ -37,14 +38,14 @@ export async function PATCH(
       // If toggling to published without explicit date, set publishedAt now
       const snap = await adminDb()
         .collection("articles")
-        .doc(params.id)
+        .doc(id)
         .get();
       if (snap.exists && !snap.data()?.publishedAt) {
         update.publishedAt = new Date();
       }
     }
 
-    await adminDb().collection("articles").doc(params.id).update(update);
+    await adminDb().collection("articles").doc(id).update(update);
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (err instanceof Response) return err;
@@ -55,11 +56,12 @@ export async function PATCH(
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     await assertAdmin();
-    await adminDb().collection("articles").doc(params.id).delete();
+    await adminDb().collection("articles").doc(id).delete();
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (err instanceof Response) return err;

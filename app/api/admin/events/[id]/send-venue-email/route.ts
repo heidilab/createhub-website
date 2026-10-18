@@ -20,8 +20,9 @@ interface SessionShape {
  */
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const user = await getSessionUser();
   if (!user || user.role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -43,7 +44,7 @@ export async function POST(
   }
 
   const db = adminDb();
-  const eventSnap = await db.collection("events").doc(params.id).get();
+  const eventSnap = await db.collection("events").doc(id).get();
   if (!eventSnap.exists) {
     return NextResponse.json({ error: "活動不存在" }, { status: 404 });
   }
@@ -57,7 +58,7 @@ export async function POST(
 
   const regSnap = await db
     .collection("registrations")
-    .where("eventId", "==", params.id)
+    .where("eventId", "==", id)
     .where("paymentStatus", "in", ["paid", "free"])
     .get();
 
@@ -99,7 +100,7 @@ export async function POST(
             eventDateText: dateText,
             venueAddress: venueAddress.trim(),
             mapUrl: mapUrl?.trim() || "",
-            eventUrl: `${SITE_URL}/events/${params.id}`,
+            eventUrl: `${SITE_URL}/events/${id}`,
           }),
         });
         await regDoc.ref.update({ venueEmailSentAt: new Date() });

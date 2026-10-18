@@ -36,10 +36,11 @@ async function getTeamMember(id: string): Promise<TeamMember | null> {
 export default async function EditTeamMemberPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const isNew = params.id === "new";
-  const member = isNew ? null : await getTeamMember(params.id);
+  const { id } = await params;
+  const isNew = id === "new";
+  const member = isNew ? null : await getTeamMember(id);
   if (!isNew && !member) notFound();
 
   return (

@@ -25,8 +25,9 @@ const STATUS_LABEL: Record<string, string> = {
 
 export async function GET(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const user = await getSessionUser();
   if (!user || user.role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -36,7 +37,7 @@ export async function GET(
   const format = (url.searchParams.get("format") || "xlsx").toLowerCase();
 
   const db = adminDb();
-  const eventSnap = await db.collection("events").doc(params.id).get();
+  const eventSnap = await db.collection("events").doc(id).get();
   if (!eventSnap.exists) {
     return NextResponse.json({ error: "活動不存在" }, { status: 404 });
   }
@@ -56,7 +57,7 @@ export async function GET(
 
   const regSnap = await db
     .collection("registrations")
-    .where("eventId", "==", params.id)
+    .where("eventId", "==", id)
     .get();
 
   // Fetch user profiles in batches for whatsapp
